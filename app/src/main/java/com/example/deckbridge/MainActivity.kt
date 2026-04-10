@@ -1,16 +1,14 @@
 package com.example.deckbridge
 
 import android.os.Bundle
+import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.navigation.compose.rememberNavController
+import com.example.deckbridge.ui.navigation.DeckBridgeNavHost
 import com.example.deckbridge.ui.theme.DeckBridgeTheme
 
 class MainActivity : ComponentActivity() {
@@ -19,29 +17,24 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             DeckBridgeTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+                val navController = rememberNavController()
+                DeckBridgeNavHost(
+                    navController = navController,
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
         }
     }
-}
 
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    DeckBridgeTheme {
-        Greeting("Android")
+    override fun onResume() {
+        super.onResume()
+        appRepository().refreshAttachedKeyboards()
     }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        appRepository().notifyKeyEvent(event)
+        return super.dispatchKeyEvent(event)
+    }
+
+    private fun appRepository() = (application as DeckBridgeApplication).repository
 }
