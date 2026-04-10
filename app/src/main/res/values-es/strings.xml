@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">DeckBridge</string>
+    <string name="home_subtitle">Puente para macro deck · depuración por Wi‑Fi</string>
+    <string name="home_hero_title">Deck en vivo</string>
+    <string name="home_hero_subtitle">Refleja tu hardware calibrado en tiempo real.</string>
+
+    <string name="section_system_status">Estado del sistema</string>
+    <string name="section_host_platform_deck">Plataforma del equipo (atajos)</string>
+    <string name="host_platform_deck_hint">Define cómo se resuelven Copiar, Pegar, Rehacer y acciones similares. Se guarda en el dispositivo.</string>
+    <string name="platform_chip_windows">Windows</string>
+    <string name="platform_chip_mac">macOS</string>
+    <string name="section_physical_keyboard">Teclado físico</string>
+    <string name="section_input_diagnostics">Diagnóstico de entrada</string>
+    <string name="section_host">Equipo actual</string>
+    <string name="section_future_actions">Próximas acciones</string>
+    <string name="section_recent_events">Eventos recientes</string>
+    <string name="section_deck_preview">Deck en pantalla</string>
+    <string name="section_technical_logs">Detalles técnicos y registros</string>
+    <string name="technical_logs_expand">Mostrar</string>
+    <string name="technical_logs_collapse">Ocultar</string>
+    <string name="section_deck_activations">Activaciones del deck</string>
+
+    <string name="label_connection_state">Estado de conexión</string>
+    <string name="label_device_name">Dispositivo: %s</string>
+    <string name="label_host_platform">Plataforma de destino</string>
+    <string name="label_usb_session">Sesión USB con el equipo</string>
+    <string name="label_host_name">Equipo: %s</string>
+
+    <string name="kb_state_disconnected">Sin teclado</string>
+    <string name="kb_state_connecting">Conectando…</string>
+    <string name="kb_state_connected">Conectado</string>
+    <string name="kb_state_error">Error</string>
+
+    <string name="usb_state_not_connected">Sin conexión</string>
+    <string name="usb_state_attached_idle">Cable bien · sin agente</string>
+    <string name="usb_state_ready">Listo para enviar</string>
+    <string name="usb_state_error">Error USB</string>
+
+    <string name="platform_windows">Windows</string>
+    <string name="platform_mac">macOS</string>
+    <string name="platform_unknown">Desconocido</string>
+
+    <string name="bindings_preview_title">Atajos físicos (vista previa)</string>
+    <string name="binding_to_button">%1$s → %2$s</string>
+    <string name="binding_unassigned">%s · sin asignar</string>
+
+    <string name="future_actions_body">Próximo hito: enviar acciones a la PC por USB (Windows/macOS) y ejecutarlas con un agente en el equipo. Esta pantalla ya separa teclado, host y deck para integrar la lógica real sin rehacer la interfaz.</string>
+
+    <string name="recent_events_empty">Aún no hay eventos. Con la app en primer plano, prueba F1–F9 en el teclado físico.</string>
+    <string name="event_line">%1$s · %2$s</string>
+    <string name="event_pressed">pulsación</string>
+    <string name="event_released">soltar</string>
+    <string name="motion_down">ACTION_DOWN</string>
+    <string name="motion_up">ACTION_UP</string>
+    <string name="event_detail_line">keyCode=%1$d · %2$s · deviceId=%3$d · %4$s</string>
+    <string name="source_hardware">Origen: hardware (KeyEvent)</string>
+    <string name="source_simulated">Origen: simulado (vista previa)</string>
+
+    <string name="class_external_hw">Teclado físico externo</string>
+    <string name="class_built_in">Teclado integrado</string>
+    <string name="class_software">Virtual / software</string>
+    <string name="class_unknown">No es teclado / desconocido</string>
+
+    <string name="diag_hint">%s</string>
+    <string name="diag_last_event_title">Último evento</string>
+    <string name="diag_none_yet">Aún no hay eventos de hardware en esta sesión.</string>
+    <string name="diag_device_name">Nombre: %s</string>
+    <string name="diag_device_id">deviceId: %d</string>
+    <string name="diag_vendor_product">Fabricante/Producto: 0x%1$04X / 0x%2$04X</string>
+    <string name="diag_vendor_product_unknown">Fabricante/Producto: no disponible</string>
+    <string name="diag_descriptor">Descriptor: %s</string>
+    <string name="diag_descriptor_unknown">Descriptor: no disponible</string>
+    <string name="diag_sources_simple">Fuentes: %1$s · flags=0x%2$08X</string>
+    <string name="diag_classification">Clasificación: %s</string>
+    <string name="diag_motion_key">Acción: %1$s · keyCode=%2$d</string>
+    <string name="diag_external_list_title">Teclados externos detectados (%d)</string>
+    <string name="diag_external_line">· %1$s (id=%2$d)</string>
+    <string name="diag_external_empty">Ninguno por ahora (revisa la conexión y vuelve a esta pantalla).</string>
+
+    <string name="profile_active">Perfil activo: %s</string>
+
+    <string name="deck_activations_empty">Aún no hay activaciones. Pulsa F1–F9 o un botón del deck.</string>
+    <string name="deck_activation_line">%1$s — %2$s</string>
+    <string name="deck_activation_platform">Plataforma: %s</string>
+    <string name="deck_activation_resolved">Resuelto: %s</string>
+    <string name="deck_activation_intent_line">Intención: %s</string>
+    <string name="deck_tile_physical">Tecla: %s</string>
+    <string name="deck_tile_physical_none">Tecla: —</string>
+    <string name="trigger_touch">Origen: toque en pantalla</string>
+    <string name="trigger_hardware_key">Origen: tecla física</string>
+    <string name="trigger_hardware_knob">Origen: perilla física</string>
+    <string name="trigger_simulated_activation">Origen: simulado</string>
+
+    <string name="section_hardware_mirror">Espejo del hardware</string>
+    <string name="hardware_mirror_status">Calibración: %s</string>
+    <string name="hardware_calibrated_yes">completa — pad y perillas aprendidas</string>
+    <string name="hardware_calibrated_no">incompleta — ejecuta la calibración</string>
+    <string name="hardware_last_control">Último control: %1$s · %2$s</string>
+    <string name="mirror_status_ready">Listo</string>
+    <string name="mirror_status_setup">Requiere configuración</string>
+    <string name="mirror_last_interaction">%1$s · %2$s</string>
+    <string name="mirror_action_pad_press">Pulsado</string>
+    <string name="mirror_action_knob_press">Presionado</string>
+    <string name="mirror_action_knob_release">Soltado</string>
+    <string name="mirror_knob_role_top">Vol − / Vol + · pulso: Play</string>
+    <string name="mirror_knob_role_middle">Copiar / Pegar</string>
+    <string name="mirror_knob_role_bottom">Pista ant. / sig.</string>
+    <string name="mirror_action_knob_cw">Giro +</string>
+    <string name="mirror_action_knob_ccw">Giro −</string>
+    <string name="mirror_pad_fallback">Tecla del pad</string>
+    <string name="knob_top">Perilla superior</string>
+    <string name="knob_middle">Perilla central</string>
+    <string name="knob_bottom">Perilla inferior</string>
+    <string name="knob_generic">Perilla %d</string>
+    <string name="pad_cell_short">%1$d·%2$d</string>
+    <string name="home_open_calibration">Ajustar calibración</string>
+    <string name="hardware_mirror_hint">Las perillas a la izquierda coinciden con tu dispositivo; cada casilla del pad puede mostrar medios y atajos después de calibrar.</string>
+    <string name="status_strip_keyboard_off">Sin teclado</string>
+    <string name="status_strip_platform">Equipo: %s</string>
+
+    <string name="section_raw_diagnostics">Registro bruto (teclas + movimiento)</string>
+    <string name="raw_diagnostics_empty">Aún no hay líneas. Aquí aparecen teclas y movimiento tipo scroll.</string>
+    <string name="raw_diagnostics_line">%1$s · %2$s</string>
+
+    <string name="calibration_title">Calibración del hardware</string>
+    <string name="calibration_back">Atrás</string>
+    <string name="calibration_saved_hint">Calibración guardada. Puedes volver al inicio; el espejo usará este mapeo.</string>
+    <string name="calibration_starting">Iniciando asistente…</string>
+    <string name="calibration_exit">Cerrar asistente</string>
+    <string name="calibration_step_counter">Paso %1$d de %2$d</string>
+    <string name="calibration_last_capture">Capturado: %s</string>
+    <string name="calibration_step_pad">Pulsa la tecla física de la casilla del pad, fila %1$d, columna %2$d (fila 1 = arriba, columna 1 = izquierda).</string>
+    <string name="calibration_step_knob_ccw">Gira %s en un sentido (p. ej. izquierda / abajo). Usa la tecla o scroll que envíe el dispositivo para ese sentido.</string>
+    <string name="calibration_step_knob_cw">Gira %s al sentido contrario (p. ej. derecha / arriba). Debe ser distinto del paso anterior.</string>
+    <string name="calibration_step_knob_press">Pulsa %s una vez si actúa como botón. Si Android no entrega ninguna tecla, usa «Omitir pulsación»: el giro sigue mapeado.</string>
+    <string name="calibration_motion_hint">Giro: Android puede enviar KeyEvent (p. ej. volumen) y/o scroll en MotionEvent. Pulsación: solo si el dispositivo expone un KeyEvent distinto; muchas perillas no lo hacen.</string>
+    <string name="calibration_skip_press_button">Omitir pulsación</string>
+    <string name="calibration_skipped_press_summary">(pulsación omitida)</string>
+    <string name="calibration_error_press_same_as_rotate">Usa otra tecla para la pulsación distinta del giro en esta perilla.</string>
+    <string name="calibration_error_knob_cw_key_on_ccw_step">Esa tecla ya se usó en el paso horario de esta perilla. Gira al otro lado u otro control.</string>
+    <string name="calibration_error_knob_ccw_key_on_cw_step">Esa tecla ya se usó en el paso antihorario de esta perilla. Gira al otro lado u otro control.</string>
+
+    <string name="calibration_error_duplicate_key">Esa tecla ya está asignada. Pulsa otra.</string>
+    <string name="status_capture_active">Escuchando hardware · Mantén DeckBridge en primer plano al probar por Wi‑Fi</string>
+    <string name="physical_kb_detail_connected_scan">Teclado externo detectado (%1$d). Último id=%2$d</string>
+    <string name="physical_kb_detail_disconnected">Sin teclado externo con fuente de teclado. Conecta USB o Bluetooth y vuelve a abrir la app.</string>
+    <string name="physical_kb_detail_from_event">Evento desde teclado externo (deviceId=%1$d)</string>
+    <string name="input_hint_no_keyboards">Aún no hay teclados externos listados. Mantén la app en primer plano y prueba F1–F9 o tu pad calibrado.</string>
+    <string name="input_hint_keyboards_summary">Teclados externos: %1$d · Último: %2$s (id=%3$d)</string>
+
+    <string name="profile_name_windows">Windows</string>
+    <string name="profile_name_mac">macOS</string>
+    <string name="deck_action_copy">Copiar</string>
+    <string name="deck_action_paste">Pegar</string>
+    <string name="deck_action_vol_up">Vol +</string>
+    <string name="deck_action_play_pause">Reproducir / Pausa</string>
+    <string name="deck_action_search">Buscar</string>
+    <string name="deck_action_cut">Cortar</string>
+    <string name="deck_action_undo">Deshacer</string>
+    <string name="deck_action_redo">Rehacer</string>
+    <string name="deck_action_mute">Silenciar</string>
+
+    <string name="mock_runtime_bootstrap_status">DeckBridge · Espejo de hardware calibrado y atajos del equipo</string>
+    <string name="mock_waiting_input_manager">Esperando enumeración del teclado…</string>
+    <string name="mock_preview_input_hint">Vista previa: teclado macro simulado conectado.</string>
+    <string name="mock_preview_keyboard_detail">Datos simulados para vista previa</string>
+    <string name="mock_preview_screen_status">Vista previa · Hardware simulado</string>
+
+    <string name="settings_title">Diagnóstico y registros</string>
+    <string name="settings_back">Atrás</string>
+    <string name="fab_open_settings">Abrir diagnóstico y registros</string>
+    <string name="settings_logcat_hint_title">Logcat</string>
+    <string name="settings_logcat_hint_body">Etiqueta: DeckBridge · Líneas: [STATE] [INPUT] [MATCH] [UI] [PERF] [CAL] [KNOB] [ACTION] · Teclas detalladas: solo builds DEBUG · adb logcat -s DeckBridge</string>
+
+    <string name="settings_section_session">Hardware en vivo</string>
+    <string name="settings_last_control_none">Aún no hay coincidencias. Usa el deck; en Logcat verás [MATCH].</string>
+    <string name="settings_last_control_line">%1$s · %2$s</string>
+    <string name="settings_calibration_map">Mapeo guardado</string>
+    <string name="settings_calibration_device">Dispositivo: %s</string>
+    <string name="settings_calibration_device_unknown">Dispositivo: (sin bloqueo)</string>
+    <string name="settings_calibration_pads">Teclas del pad: %1$d / 9</string>
+    <string name="settings_knob_binding_line">%1$s: teclas CCW %2$d · CW %3$d · movimiento %4$d · pulsación %5$s</string>
+    <string name="settings_bind_yes">sí</string>
+    <string name="settings_bind_no">no</string>
+    <string name="settings_section_keyboard_host">Teclado y equipo</string>
+    <string name="settings_raw_tail">Líneas crudas recientes</string>
+    <string name="settings_raw_tail_subtitle">Mismo canal que Logcat [INPUT]; aquí solo un resumen.</string>
+    <string name="settings_activations_recent">Activaciones recientes del deck</string>
+
+    <string name="host_default_label">PC de trabajo (Win 11)</string>
+    <string name="host_usb_detail_placeholder">Agente/host USB aún no implementado · el estado en vivo aparecerá aquí</string>
+</resources>
