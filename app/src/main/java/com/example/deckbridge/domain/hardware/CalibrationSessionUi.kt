@@ -1,7 +1,7 @@
 package com.example.deckbridge.domain.hardware
 
 /**
- * Wizard state exposed to [com.example.deckbridge.ui.calibration.CalibrationScreen].
+ * Wizard state for the hardware calibration flow (see `ui.calibration.CalibrationScreen`).
  */
 data class CalibrationSessionUi(
     val stepIndex: Int,
@@ -13,6 +13,7 @@ data class CalibrationSessionUi(
 
 sealed class CalibrationStepModel {
     data class PadCell(val row: Int, val col: Int) : CalibrationStepModel()
-    data class KnobRotate(val knobIndex: Int) : CalibrationStepModel()
+    data class KnobRotateCcw(val knobIndex: Int) : CalibrationStepModel()
+    data class KnobRotateCw(val knobIndex: Int) : CalibrationStepModel()
     data class KnobPress(val knobIndex: Int) : CalibrationStepModel()
 }

@@ -2,6 +2,7 @@ package com.example.deckbridge
 
 import android.os.Bundle
 import android.view.KeyEvent
+import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -34,6 +35,11 @@ class MainActivity : ComponentActivity() {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         appRepository().notifyKeyEvent(event)
         return super.dispatchKeyEvent(event)
+    }
+
+    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
+        appRepository().notifyGenericMotionEvent(event)
+        return super.dispatchGenericMotionEvent(event)
     }
 
     private fun appRepository() = (application as DeckBridgeApplication).repository

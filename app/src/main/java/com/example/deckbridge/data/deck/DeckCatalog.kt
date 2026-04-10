@@ -1,6 +1,8 @@
 package com.example.deckbridge.data.deck
 
+import android.content.res.Resources
 import android.view.KeyEvent
+import com.example.deckbridge.R
 import com.example.deckbridge.domain.PlatformActionResolver
 import com.example.deckbridge.domain.model.AppState
 import com.example.deckbridge.domain.model.DeckButtonIntent
@@ -16,6 +18,7 @@ import com.example.deckbridge.profiles.Profile
 
 /**
  * Static F1–F9 deck layout, profiles, and bindings. Resolution for display/dispatch is driven by [HostPlatform].
+ * User-visible labels come from string resources via [Resources].
  */
 object DeckCatalog {
 
@@ -24,42 +27,46 @@ object DeckCatalog {
 
     private data class Slot(
         val id: String,
-        val label: String,
+        val labelResId: Int,
         val intent: DeckButtonIntent,
         val sortIndex: Int,
         val iconToken: String?,
     )
 
     private val slots = listOf(
-        Slot("btn_copy", "Copy", DeckButtonIntent.KeyboardChord.Copy, 0, "content_copy"),
-        Slot("btn_paste", "Paste", DeckButtonIntent.KeyboardChord.Paste, 1, "content_paste"),
-        Slot("btn_vol_up", "Vol +", DeckButtonIntent.SystemMedia.VolumeUp, 2, "volume_up"),
-        Slot("btn_play", "Play / Pause", DeckButtonIntent.SystemMedia.PlayPause, 3, "play_pause"),
-        Slot("btn_search", "Search", DeckButtonIntent.KeyboardChord.Search, 4, "search"),
-        Slot("btn_cut", "Cut", DeckButtonIntent.KeyboardChord.Cut, 5, "content_cut"),
-        Slot("btn_undo", "Undo", DeckButtonIntent.KeyboardChord.Undo, 6, "undo"),
-        Slot("btn_redo", "Redo", DeckButtonIntent.KeyboardChord.Redo, 7, "redo"),
-        Slot("btn_mute", "Mute", DeckButtonIntent.SystemMedia.Mute, 8, "volume_mute"),
+        Slot("btn_copy", R.string.deck_action_copy, DeckButtonIntent.KeyboardChord.Copy, 0, "content_copy"),
+        Slot("btn_paste", R.string.deck_action_paste, DeckButtonIntent.KeyboardChord.Paste, 1, "content_paste"),
+        Slot("btn_vol_up", R.string.deck_action_vol_up, DeckButtonIntent.SystemMedia.VolumeUp, 2, "volume_up"),
+        Slot("btn_play", R.string.deck_action_play_pause, DeckButtonIntent.SystemMedia.PlayPause, 3, "play_pause"),
+        Slot("btn_search", R.string.deck_action_search, DeckButtonIntent.KeyboardChord.Search, 4, "search"),
+        Slot("btn_cut", R.string.deck_action_cut, DeckButtonIntent.KeyboardChord.Cut, 5, "content_cut"),
+        Slot("btn_undo", R.string.deck_action_undo, DeckButtonIntent.KeyboardChord.Undo, 6, "undo"),
+        Slot("btn_redo", R.string.deck_action_redo, DeckButtonIntent.KeyboardChord.Redo, 7, "redo"),
+        Slot("btn_mute", R.string.deck_action_mute, DeckButtonIntent.SystemMedia.Mute, 8, "volume_mute"),
     )
 
-    fun profileFor(platform: HostPlatform): Profile {
+    fun profileFor(platform: HostPlatform, res: Resources): Profile {
         val p = platform.coerce()
         return when (p) {
-            HostPlatform.MAC -> Profile(id = PROFILE_MAC_ID, name = "macOS", isDefault = true)
-            HostPlatform.WINDOWS -> Profile(id = PROFILE_WINDOWS_ID, name = "Windows", isDefault = true)
-            HostPlatform.UNKNOWN -> Profile(id = PROFILE_WINDOWS_ID, name = "Windows", isDefault = true)
+            HostPlatform.MAC -> Profile(id = PROFILE_MAC_ID, name = res.getString(R.string.profile_name_mac), isDefault = true)
+            HostPlatform.WINDOWS -> Profile(id = PROFILE_WINDOWS_ID, name = res.getString(R.string.profile_name_windows), isDefault = true)
+            HostPlatform.UNKNOWN -> Profile(id = PROFILE_WINDOWS_ID, name = res.getString(R.string.profile_name_windows), isDefault = true)
         }
     }
 
-    fun profileIdFor(platform: HostPlatform): String = profileFor(platform).id
+    fun profileIdFor(platform: HostPlatform): String = when (platform.coerce()) {
+        HostPlatform.MAC -> PROFILE_MAC_ID
+        HostPlatform.WINDOWS, HostPlatform.UNKNOWN -> PROFILE_WINDOWS_ID
+    }
 
-    fun macroButtonsFor(platform: HostPlatform): List<MacroButton> {
+    /** @throws android.content.res.Resources.NotFoundException if [res] is invalid */
+    fun macroButtonsFor(platform: HostPlatform, res: Resources): List<MacroButton> {
         val p = platform.coerce()
         return slots.map { slot ->
             val resolved = PlatformActionResolver.resolve(slot.intent, p)
             MacroButton(
                 id = slot.id,
-                label = slot.label,
+                label = res.getString(slot.labelResId),
                 intent = slot.intent,
                 sortIndex = slot.sortIndex,
                 iconToken = slot.iconToken,
@@ -84,7 +91,7 @@ object DeckCatalog {
     }
 
     /** Baseline [AppState] before runtime/input overlays (used by mocks + cold start). */
-    fun baseDeckAppState(hostPlatform: HostPlatform): AppState {
+    fun baseDeckAppState(hostPlatform: HostPlatform, res: Resources): AppState {
         val p = hostPlatform.coerce()
         return AppState(
             hostPlatform = p,
@@ -95,12 +102,11 @@ object DeckCatalog {
             ),
             hostConnection = HostConnectionStatus(
                 usbState = HostUsbConnectionState.NOT_CONNECTED,
-                hostLabel = "Work PC (Win 11)",
-                detail = "USB host/agent not implemented yet · live status will appear here",
+                hostLabel = res.getString(R.string.host_default_label),
+                detail = res.getString(R.string.host_usb_detail_placeholder),
             ),
-            activeProfile = profileFor(p),
-            macroButtons = macroButtonsFor(p),
-            recentInputEvents = emptyList(),
+            activeProfile = profileFor(p, res),
+            macroButtons = macroButtonsFor(p, res),
             physicalBindingsPreview = physicalBindingsFor(p),
             inputDiagnostics = InputDiagnostics(
                 lastEventDevice = null,
@@ -114,15 +120,19 @@ object DeckCatalog {
             deckHighlight = null,
             recentDeckActivations = emptyList(),
             systemStatusLine = "",
+            hardwareCalibration = null,
+            hardwareMirrorHighlight = null,
+            hardwareDiagSummary = null,
+            rawInputDiagnostics = emptyList(),
         )
     }
 
-    fun withHostPlatform(prev: AppState, platform: HostPlatform): AppState {
+    fun withHostPlatform(prev: AppState, platform: HostPlatform, res: Resources): AppState {
         val p = platform.coerce()
         return prev.copy(
             hostPlatform = p,
-            activeProfile = profileFor(p),
-            macroButtons = macroButtonsFor(p),
+            activeProfile = profileFor(p, res),
+            macroButtons = macroButtonsFor(p, res),
             physicalBindingsPreview = physicalBindingsFor(p),
         )
     }

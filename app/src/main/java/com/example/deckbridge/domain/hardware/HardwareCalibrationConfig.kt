@@ -26,12 +26,15 @@ data class PadCell(val row: Int, val col: Int)
 
 data class KnobCalibration(
     val index: Int,
-    /** KeyCodes observed during “rotate” (e.g. volume up/down). */
-    val rotateKeyCodes: Set<Int> = emptySet(),
+    /** KeyCodes learned for counter‑clockwise / “left” rotation on this knob. */
+    val rotateCcwKeyCodes: Set<Int> = emptySet(),
+    /** KeyCodes learned for clockwise / “right” rotation on this knob. */
+    val rotateCwKeyCodes: Set<Int> = emptySet(),
     val pressKeyCode: Int? = null,
     /** Opaque fingerprints from [MotionEvent] capture, e.g. "src=4194304|axis=9|dir=+". */
     val motionFingerprints: Set<String> = emptySet(),
 ) {
     val hasAnyBinding: Boolean
-        get() = rotateKeyCodes.isNotEmpty() || pressKeyCode != null || motionFingerprints.isNotEmpty()
+        get() = rotateCcwKeyCodes.isNotEmpty() || rotateCwKeyCodes.isNotEmpty() ||
+            pressKeyCode != null || motionFingerprints.isNotEmpty()
 }

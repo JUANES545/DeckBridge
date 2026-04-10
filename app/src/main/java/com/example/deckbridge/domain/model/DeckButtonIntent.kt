@@ -37,8 +37,20 @@ sealed class DeckButtonIntent {
             override val intentId: String = "deck.intent.media.vol_up"
         }
 
+        data object VolumeDown : SystemMedia() {
+            override val intentId: String = "deck.intent.media.vol_down"
+        }
+
         data object PlayPause : SystemMedia() {
             override val intentId: String = "deck.intent.media.play_pause"
+        }
+
+        data object PreviousTrack : SystemMedia() {
+            override val intentId: String = "deck.intent.media.prev_track"
+        }
+
+        data object NextTrack : SystemMedia() {
+            override val intentId: String = "deck.intent.media.next_track"
         }
 
         data object Mute : SystemMedia() {

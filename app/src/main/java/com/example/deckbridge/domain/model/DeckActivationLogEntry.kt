@@ -1,8 +1,6 @@
 package com.example.deckbridge.domain.model
 
-/**
- * Human-readable trace of deck activations (distinct from raw [RecentInputEvent] key stream).
- */
+/** Human-readable trace of deck button activations (touch, hardware key, or simulated). */
 data class DeckActivationLogEntry(
     val id: String,
     val occurredAtEpochMs: Long,

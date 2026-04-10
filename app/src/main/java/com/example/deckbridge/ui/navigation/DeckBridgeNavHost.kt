@@ -10,11 +10,15 @@ import com.example.deckbridge.DeckBridgeApplication
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.example.deckbridge.ui.calibration.CalibrationScreen
 import com.example.deckbridge.ui.home.HomeScreen
 import com.example.deckbridge.ui.home.MainViewModel
+import com.example.deckbridge.ui.settings.SettingsScreen
 
 object DeckBridgeDestinations {
     const val HOME = "home"
+    const val CALIBRATION = "calibration"
+    const val SETTINGS = "settings"
 }
 
 @Composable
@@ -35,6 +39,27 @@ fun DeckBridgeNavHost(
                 state = state,
                 onDeckButtonTapped = viewModel::onDeckButtonTapped,
                 onHostPlatformSelected = viewModel::onHostPlatformSelected,
+                onOpenHardwareCalibration = { navController.navigate(DeckBridgeDestinations.CALIBRATION) },
+                onOpenSettings = { navController.navigate(DeckBridgeDestinations.SETTINGS) },
+            )
+        }
+        composable(DeckBridgeDestinations.SETTINGS) {
+            val app = LocalContext.current.applicationContext as DeckBridgeApplication
+            val viewModel: MainViewModel = viewModel(factory = MainViewModel.factory(app.repository))
+            val state by viewModel.state.collectAsStateWithLifecycle()
+            SettingsScreen(
+                state = state,
+                onNavigateBack = { navController.popBackStack() },
+                onRefreshKeyboards = viewModel::refreshAttachedKeyboards,
+            )
+        }
+        composable(DeckBridgeDestinations.CALIBRATION) {
+            val app = LocalContext.current.applicationContext as DeckBridgeApplication
+            CalibrationScreen(
+                onNavigateBack = {
+                    app.repository.cancelHardwareCalibration()
+                    navController.popBackStack()
+                },
             )
         }
     }

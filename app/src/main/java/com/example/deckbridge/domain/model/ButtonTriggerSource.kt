@@ -10,6 +10,9 @@ enum class ButtonTriggerSource {
     /** Matched [PhysicalKeyBinding] from a hardware [android.view.KeyEvent]. */
     HARDWARE_KEY,
 
+    /** Calibrated encoder / knob mapping (see KnobIntentMapper). */
+    HARDWARE_KNOB,
+
     /** Synthetic / tests / future in-app replay. */
     SIMULATED,
 }
