@@ -62,19 +62,19 @@ object PlatformActionResolver {
                 intent = intent,
                 displayName = "Vol+",
                 p = p,
-                label = "Media · Subir volumen",
+                label = "Media · Volume up",
             )
             is DeckButtonIntent.SystemMedia.PlayPause -> media(
                 intent = intent,
                 displayName = "Play/Pause",
                 p = p,
-                label = "Media · Reproducir/Pausa",
+                label = "Media · Play/Pause",
             )
             is DeckButtonIntent.SystemMedia.Mute -> media(
                 intent = intent,
                 displayName = "Mute",
                 p = p,
-                label = "Media · Silenciar",
+                label = "Media · Mute",
             )
         }
     }

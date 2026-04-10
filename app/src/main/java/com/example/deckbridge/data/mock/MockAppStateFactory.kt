@@ -36,7 +36,7 @@ object MockAppStateFactory {
             physicalKeyboard = PhysicalKeyboardStatus(
                 state = PhysicalKeyboardConnectionState.DISCONNECTED,
                 deviceName = null,
-                detail = "Esperando enumeración de InputManager…",
+                detail = "Waiting for InputManager enumeration…",
             ),
             inputDiagnostics = InputDiagnostics(
                 lastEventDevice = null,
@@ -45,11 +45,11 @@ object MockAppStateFactory {
                 lastKeyCode = null,
                 lastClassification = null,
                 detectedExternalKeyboards = emptyList(),
-                hintLine = "Abre la app en primer plano y conecta el teclado; usa F1–F9 para probar.",
+                hintLine = "Open the app in the foreground, connect the keyboard, and use F1–F9 to test.",
             ),
             deckHighlight = null,
             recentDeckActivations = emptyList(),
-            systemStatusLine = "MVP etapa 4 · Plataforma host + atajos resueltos + DataStore",
+            systemStatusLine = "MVP stage 4 · Host platform + resolved shortcuts + DataStore",
         )
     }
 
@@ -106,7 +106,7 @@ object MockAppStateFactory {
             physicalKeyboard = PhysicalKeyboardStatus(
                 state = PhysicalKeyboardConnectionState.CONNECTED,
                 deviceName = simulatedKeyboard.name,
-                detail = "Datos simulados para preview",
+                detail = "Simulated data for preview",
             ),
             inputDiagnostics = InputDiagnostics(
                 lastEventDevice = simulatedKeyboard,
@@ -115,11 +115,11 @@ object MockAppStateFactory {
                 lastKeyCode = KeyEvent.KEYCODE_F2,
                 lastClassification = KeyboardInputClassification.EXTERNAL_HARDWARE_KEYBOARD,
                 detectedExternalKeyboards = listOf(simulatedKeyboard),
-                hintLine = "Vista previa: teclado macro simulado conectado.",
+                hintLine = "Preview: simulated macro keyboard connected.",
             ),
             deckHighlight = null,
             recentDeckActivations = emptyList(),
-            systemStatusLine = "Vista previa · Datos simulados",
+            systemStatusLine = "Preview · Simulated data",
         )
     }
 }

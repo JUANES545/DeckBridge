@@ -199,13 +199,13 @@ class DeckBridgeRepositoryImpl(
             PhysicalKeyboardStatus(
                 state = PhysicalKeyboardConnectionState.CONNECTED,
                 deviceName = first.name,
-                detail = "Teclado externo detectado (${detected.size}). Último id=${first.deviceId}",
+                detail = "External keyboard detected (${detected.size}). Last id=${first.deviceId}",
             )
         } else {
             PhysicalKeyboardStatus(
                 state = PhysicalKeyboardConnectionState.DISCONNECTED,
                 deviceName = null,
-                detail = "Sin teclado externo con fuente keyboard. Conecta USB o Bluetooth y vuelve a abrir la app.",
+                detail = "No external keyboard with keyboard source. Connect USB or Bluetooth and reopen the app.",
             )
         }
     }
@@ -222,7 +222,7 @@ class DeckBridgeRepositoryImpl(
             PhysicalKeyboardStatus(
                 state = PhysicalKeyboardConnectionState.CONNECTED,
                 deviceName = snapshot.name,
-                detail = "Evento desde teclado externo (deviceId=${snapshot.deviceId})",
+                detail = "Event from external keyboard (deviceId=${snapshot.deviceId})",
             )
         } else {
             previous
@@ -231,9 +231,9 @@ class DeckBridgeRepositoryImpl(
 
     private fun hintFor(detected: List<InputDeviceSnapshot>): String {
         return if (detected.isEmpty()) {
-            "Ningún teclado externo enumerado todavía. Deja la app en primer plano y pulsa F1–F9."
+            "No external keyboards enumerated yet. Keep the app in the foreground and press F1–F9."
         } else {
-            "Teclados externos: ${detected.size}. Último visto: ${detected.first().name} (id=${detected.first().deviceId})."
+            "External keyboards: ${detected.size}. Last seen: ${detected.first().name} (id=${detected.first().deviceId})."
         }
     }
 
@@ -241,6 +241,6 @@ class DeckBridgeRepositoryImpl(
         private const val MAX_RECENT_EVENTS = 25
         private const val MAX_ACTIVATIONS = 25
         private const val STATUS_CAPTURE_ACTIVE =
-            "Captura hardware activa · Mantén la app en primer plano para ver KeyEvents"
+            "Hardware capture active · Keep the app in the foreground to see KeyEvents"
     }
 }
