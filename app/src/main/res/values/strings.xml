@@ -1,3 +1,87 @@
 <resources>
     <string name="app_name">DeckBridge</string>
+    <string name="home_subtitle">Atajos por plataforma · DataStore</string>
+
+    <string name="section_system_status">Estado general</string>
+    <string name="section_host_platform_deck">Plataforma del host (atajos)</string>
+    <string name="host_platform_deck_hint">Define cómo se resuelven Copy, Paste, Redo, etc. Se guarda en el dispositivo.</string>
+    <string name="platform_chip_windows">Windows</string>
+    <string name="platform_chip_mac">macOS</string>
+    <string name="section_physical_keyboard">Teclado físico</string>
+    <string name="section_input_diagnostics">Diagnóstico de entrada</string>
+    <string name="section_host">Host actual</string>
+    <string name="section_future_actions">Acciones futuras</string>
+    <string name="section_recent_events">Eventos recientes</string>
+    <string name="section_deck_preview">Deck (3×3)</string>
+    <string name="section_deck_activations">Activaciones del deck</string>
+
+    <string name="label_connection_state">Estado de conexión</string>
+    <string name="label_device_name">Dispositivo: %s</string>
+    <string name="label_host_platform">Plataforma objetivo</string>
+    <string name="label_usb_session">Sesión USB con host</string>
+    <string name="label_host_name">Host: %s</string>
+
+    <string name="kb_state_disconnected">Sin teclado</string>
+    <string name="kb_state_connecting">Conectando…</string>
+    <string name="kb_state_connected">Conectado</string>
+    <string name="kb_state_error">Error</string>
+
+    <string name="usb_state_not_connected">No conectado</string>
+    <string name="usb_state_attached_idle">Cable OK · sin agente</string>
+    <string name="usb_state_ready">Listo para enviar</string>
+    <string name="usb_state_error">Error USB</string>
+
+    <string name="platform_windows">Windows</string>
+    <string name="platform_mac">macOS</string>
+    <string name="platform_unknown">Desconocida</string>
+
+    <string name="bindings_preview_title">Atajos físicos (vista previa)</string>
+    <string name="binding_to_button">%1$s → %2$s</string>
+    <string name="binding_unassigned">%s · sin asignar</string>
+
+    <string name="future_actions_body">En la siguiente etapa: envío de acciones al PC por USB (Windows/macOS) y ejecución vía agente en el host. Esta pantalla ya separa estado del teclado, host y deck para enganchar la lógica real sin reescribir la UI.</string>
+
+    <string name="recent_events_empty">Sin eventos todavía. Con la app en primer plano, pulsa F1–F9 en el teclado físico.</string>
+    <string name="event_line">%1$s · %2$s</string>
+    <string name="event_pressed">pulsación</string>
+    <string name="event_released">soltado</string>
+    <string name="motion_down">ACTION_DOWN</string>
+    <string name="motion_up">ACTION_UP</string>
+    <string name="event_detail_line">keyCode=%1$d · %2$s · deviceId=%3$d · %4$s</string>
+    <string name="source_hardware">Origen: hardware (KeyEvent)</string>
+    <string name="source_simulated">Origen: simulado (preview)</string>
+
+    <string name="class_external_hw">Teclado físico externo</string>
+    <string name="class_built_in">Teclado integrado</string>
+    <string name="class_software">Virtual / software</string>
+    <string name="class_unknown">No teclado / desconocido</string>
+
+    <string name="diag_hint">%s</string>
+    <string name="diag_last_event_title">Último evento</string>
+    <string name="diag_none_yet">Aún no hay eventos hardware en esta sesión.</string>
+    <string name="diag_device_name">Nombre: %s</string>
+    <string name="diag_device_id">deviceId: %d</string>
+    <string name="diag_vendor_product">Vendor/Product: 0x%1$04X / 0x%2$04X</string>
+    <string name="diag_vendor_product_unknown">Vendor/Product: no disponible</string>
+    <string name="diag_descriptor">Descriptor: %s</string>
+    <string name="diag_descriptor_unknown">Descriptor: no disponible</string>
+    <string name="diag_sources_simple">Sources: %1$s · flags=0x%2$08X</string>
+    <string name="diag_classification">Clasificación: %s</string>
+    <string name="diag_motion_key">Acción: %1$s · keyCode=%2$d</string>
+    <string name="diag_external_list_title">Teclados externos detectados (%d)</string>
+    <string name="diag_external_line">· %1$s (id=%2$d)</string>
+    <string name="diag_external_empty">Ninguno enumerado aún (revisa conexión y vuelve a entrar).</string>
+
+    <string name="profile_active">Perfil activo: %s</string>
+
+    <string name="deck_activations_empty">Aún no hay activaciones. Pulsa F1–F9 o toca un botón del deck.</string>
+    <string name="deck_activation_line">%1$s — %2$s</string>
+    <string name="deck_activation_platform">Plataforma: %s</string>
+    <string name="deck_activation_resolved">Resuelto: %s</string>
+    <string name="deck_activation_intent_line">Intención: %s</string>
+    <string name="deck_tile_physical">Tecla: %s</string>
+    <string name="deck_tile_physical_none">Tecla: —</string>
+    <string name="trigger_touch">Origen: toque en pantalla</string>
+    <string name="trigger_hardware_key">Origen: tecla física</string>
+    <string name="trigger_simulated_activation">Origen: simulado</string>
 </resources>
