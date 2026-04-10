@@ -11,7 +11,7 @@ internal object InputDeviceSnapshotFactory {
         if (device == null) {
             return InputDeviceSnapshot(
                 deviceId = -1,
-                name = "Desconocido",
+                name = "Unknown",
                 descriptor = null,
                 vendorId = null,
                 productId = null,
@@ -34,7 +34,7 @@ internal object InputDeviceSnapshotFactory {
 
         return InputDeviceSnapshot(
             deviceId = device.id,
-            name = device.name ?: "Sin nombre",
+            name = device.name ?: "Unnamed",
             descriptor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
                 device.descriptor
             } else {

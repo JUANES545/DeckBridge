@@ -13,9 +13,9 @@ sealed class ButtonAction {
         val operation: ClipboardOperation,
     ) : ButtonAction() {
         override val summary: String = when (operation) {
-            ClipboardOperation.COPY -> "Copiar"
-            ClipboardOperation.PASTE -> "Pegar"
-            ClipboardOperation.CUT -> "Cortar"
+            ClipboardOperation.COPY -> "Copy"
+            ClipboardOperation.PASTE -> "Paste"
+            ClipboardOperation.CUT -> "Cut"
         }
     }
 
@@ -24,10 +24,10 @@ sealed class ButtonAction {
         val control: MediaControl,
     ) : ButtonAction() {
         override val summary: String = when (control) {
-            MediaControl.PLAY_PAUSE -> "Reproducir / Pausa"
-            MediaControl.VOLUME_UP -> "Subir volumen"
-            MediaControl.VOLUME_DOWN -> "Bajar volumen"
-            MediaControl.MUTE -> "Silenciar"
+            MediaControl.PLAY_PAUSE -> "Play / Pause"
+            MediaControl.VOLUME_UP -> "Volume up"
+            MediaControl.VOLUME_DOWN -> "Volume down"
+            MediaControl.MUTE -> "Mute"
         }
     }
 

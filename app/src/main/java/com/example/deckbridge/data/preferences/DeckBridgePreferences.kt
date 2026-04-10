@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.map
 private val Context.deckBridgeDataStore: DataStore<Preferences> by preferencesDataStore(name = "deck_bridge_settings")
 
 private val KEY_HOST_PLATFORM = stringPreferencesKey("host_platform")
+private val KEY_HARDWARE_CALIBRATION_JSON = stringPreferencesKey("hardware_calibration_json")
 
 fun Context.deckBridgePreferences(): DataStore<Preferences> = deckBridgeDataStore
 
@@ -30,6 +31,20 @@ suspend fun DataStore<Preferences>.writePersistedHostPlatform(platform: HostPlat
         prefs[KEY_HOST_PLATFORM] = when (platform) {
             HostPlatform.MAC -> "MAC"
             HostPlatform.WINDOWS, HostPlatform.UNKNOWN -> "WINDOWS"
+        }
+    }
+}
+
+suspend fun DataStore<Preferences>.readHardwareCalibrationJson(): String? {
+    return data.map { it[KEY_HARDWARE_CALIBRATION_JSON] }.first()
+}
+
+suspend fun DataStore<Preferences>.writeHardwareCalibrationJson(json: String?) {
+    edit { prefs ->
+        if (json.isNullOrBlank()) {
+            prefs.remove(KEY_HARDWARE_CALIBRATION_JSON)
+        } else {
+            prefs[KEY_HARDWARE_CALIBRATION_JSON] = json
         }
     }
 }

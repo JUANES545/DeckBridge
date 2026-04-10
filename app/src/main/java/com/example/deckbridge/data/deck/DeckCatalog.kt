@@ -95,8 +95,8 @@ object DeckCatalog {
             ),
             hostConnection = HostConnectionStatus(
                 usbState = HostUsbConnectionState.NOT_CONNECTED,
-                hostLabel = "PC trabajo (Win 11)",
-                detail = "USB host/agente aún no implementado · se mostrará estado real aquí",
+                hostLabel = "Work PC (Win 11)",
+                detail = "USB host/agent not implemented yet · live status will appear here",
             ),
             activeProfile = profileFor(p),
             macroButtons = macroButtonsFor(p),
