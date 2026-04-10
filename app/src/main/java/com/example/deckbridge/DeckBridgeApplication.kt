@@ -1,7 +1,9 @@
 package com.example.deckbridge
 
 import android.app.Application
+import com.example.deckbridge.actions.HidTransportDispatcher
 import com.example.deckbridge.actions.LoggingActionDispatcher
+import com.example.deckbridge.hid.HidGadgetSession
 import com.example.deckbridge.data.preferences.deckBridgePreferences
 import com.example.deckbridge.data.repository.DeckBridgeRepository
 import com.example.deckbridge.data.repository.DeckBridgeRepositoryImpl
@@ -21,10 +23,14 @@ class DeckBridgeApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         DeckBridgeLog.state("Application onCreate · DeckBridge")
+        val hidGadgetSession = HidGadgetSession()
+        val loggingDispatcher = LoggingActionDispatcher()
+        val hidTransportDispatcher = HidTransportDispatcher(hidGadgetSession, loggingDispatcher)
         repository = DeckBridgeRepositoryImpl(
             appContext = this,
             externalScope = applicationScope,
-            actionDispatcher = LoggingActionDispatcher(),
+            hidTransportDispatcher = hidTransportDispatcher,
+            hidGadgetSession = hidGadgetSession,
             dataStore = deckBridgePreferences(),
         )
         repository.refreshAttachedKeyboards()

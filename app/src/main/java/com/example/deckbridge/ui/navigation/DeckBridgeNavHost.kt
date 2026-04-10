@@ -50,7 +50,11 @@ fun DeckBridgeNavHost(
             SettingsScreen(
                 state = state,
                 onNavigateBack = { navController.popBackStack() },
-                onRefreshKeyboards = viewModel::refreshAttachedKeyboards,
+                onRefreshKeyboards = {
+                    viewModel.refreshAttachedKeyboards()
+                    viewModel.refreshHostAndTransport()
+                },
+                onHostAutoDetectChanged = viewModel::setHostAutoDetect,
             )
         }
         composable(DeckBridgeDestinations.CALIBRATION) {

@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">DeckBridge</string>
-    <string name="home_subtitle">Puente para macro deck · depuración por Wi‑Fi</string>
-    <string name="home_hero_title">Deck en vivo</string>
-    <string name="home_hero_subtitle">Refleja tu hardware calibrado en tiempo real.</string>
 
     <string name="section_system_status">Estado del sistema</string>
     <string name="section_host_platform_deck">Plataforma del equipo (atajos)</string>
@@ -115,7 +112,6 @@
     <string name="knob_generic">Perilla %d</string>
     <string name="pad_cell_short">%1$d·%2$d</string>
     <string name="home_open_calibration">Ajustar calibración</string>
-    <string name="hardware_mirror_hint">Las perillas a la izquierda coinciden con tu dispositivo; cada casilla del pad puede mostrar medios y atajos después de calibrar.</string>
     <string name="status_strip_keyboard_off">Sin teclado</string>
     <string name="status_strip_platform">Equipo: %s</string>
 
@@ -151,6 +147,7 @@
 
     <string name="profile_name_windows">Windows</string>
     <string name="profile_name_mac">macOS</string>
+    <string name="profile_name_unknown">Equipo desconocido</string>
     <string name="deck_action_copy">Copiar</string>
     <string name="deck_action_paste">Pegar</string>
     <string name="deck_action_vol_up">Vol +</string>
@@ -171,7 +168,7 @@
     <string name="settings_back">Atrás</string>
     <string name="fab_open_settings">Abrir diagnóstico y registros</string>
     <string name="settings_logcat_hint_title">Logcat</string>
-    <string name="settings_logcat_hint_body">Etiqueta: DeckBridge · Líneas: [STATE] [INPUT] [MATCH] [UI] [PERF] [CAL] [KNOB] [ACTION] · Teclas detalladas: solo builds DEBUG · adb logcat -s DeckBridge</string>
+    <string name="settings_logcat_hint_body">Etiqueta: DeckBridge · Líneas: [STATE] [INPUT] [MATCH] [UI] [PERF] [CAL] [KNOB] [ACTION] [HID] · Teclas detalladas: solo builds DEBUG · adb logcat -s DeckBridge</string>
 
     <string name="settings_section_session">Hardware en vivo</string>
     <string name="settings_last_control_none">Aún no hay coincidencias. Usa el deck; en Logcat verás [MATCH].</string>
@@ -184,10 +181,40 @@
     <string name="settings_bind_yes">sí</string>
     <string name="settings_bind_no">no</string>
     <string name="settings_section_keyboard_host">Teclado y equipo</string>
+    <string name="settings_section_hid_host">USB HID al PC</string>
+    <string name="settings_host_auto_detect">Detección automática del equipo</string>
+    <string name="settings_host_auto_detect_hint">Experimental. Android no puede saber Windows vs macOS solo por USB; a menudo verás “Desconocido” y deberás elegir la plataforma en la pantalla principal.</string>
+    <string name="settings_host_source_manual">Equipo: selección manual</string>
+    <string name="settings_host_source_auto">Equipo: automático (heurística)</string>
+    <string name="settings_hid_transport">Transporte HID</string>
+    <string name="settings_hid_keyboard">Gadget teclado</string>
+    <string name="settings_hid_consumer">Gadget multimedia / consumer</string>
+    <string name="hid_transport_summary_not_probed">Sin sondear aún</string>
+    <string name="hid_transport_summary_probing">Sondeando…</string>
+    <string name="hid_transport_summary_no_nodes">No disponible (sin /dev/hidg*)</string>
+    <string name="hid_transport_summary_denied">Gadget presente · acceso denegado</string>
+    <string name="hid_transport_summary_keyboard_ready">Teclado HID listo</string>
+    <string name="hid_transport_summary_full_ready">Teclado + multimedia HID listos</string>
+    <string name="hid_transport_summary_error">Error HID</string>
+    <string name="hid_transport_detail_default">La salida real al PC cableado requiere USB gadget con HID (root, kernel a medida o configfs). Los teléfonos de serie suelen ofrecer solo MTP/ADB — DeckBridge sigue funcionando; revisa [HID] y [ACTION] en Logcat.</string>
+    <string name="hid_transport_paths">Teclado: %1$s · Consumer: %2$s</string>
+    <string name="hid_transport_nodes_line">Sondeo: teclado %1$s · consumer %2$s</string>
+    <string name="hid_node_state_missing">no existe</string>
+    <string name="hid_node_state_writable">escribible</string>
+    <string name="hid_node_state_present_blocked">existe, no escribible</string>
+    <string name="hid_transport_last_error">Último error: %s</string>
+    <string name="hid_log_diagnose_no_nodes">Diagnóstico: no hay nodos /dev/hidg*. El USB a Windows (carga/MTP/ADB) no convierte el teléfono en teclado HID. El PC no recibirá teclas hasta que exista gadget HID (kernel/configfs, a menudo root). Las líneas [ACTION] son solo registro/respaldo.</string>
+    <string name="hid_log_diagnose_keyboard_denied">Diagnóstico: el nodo teclado HID existe pero la app no puede escribirlo (SELinux/permisos). %1$s</string>
+    <string name="hid_log_diagnose_media_only">Diagnóstico: teclado HID OK; multimedia omitida — no hay nodo consumer escribible en %1$s</string>
+    <string name="host_detect_manual">Plataforma elegida manualmente en la pantalla principal.</string>
+    <string name="host_detect_usb_disconnected">USB no conectado al equipo (o estado no disponible).</string>
+    <string name="host_detect_usb_unknown_os">USB conectado; el SO del equipo no se puede determinar en Android estándar. Elige Windows o macOS manualmente para los atajos correctos.</string>
+    <string name="host_usb_hid_ready">USB conectado · endpoint teclado HID escribible</string>
+    <string name="host_usb_attached_no_hid">USB conectado · gadget HID no disponible para la app</string>
     <string name="settings_raw_tail">Líneas crudas recientes</string>
     <string name="settings_raw_tail_subtitle">Mismo canal que Logcat [INPUT]; aquí solo un resumen.</string>
     <string name="settings_activations_recent">Activaciones recientes del deck</string>
 
     <string name="host_default_label">PC de trabajo (Win 11)</string>
-    <string name="host_usb_detail_placeholder">Agente/host USB aún no implementado · el estado en vivo aparecerá aquí</string>
+    <string name="host_usb_detail_placeholder">El estado USB se actualiza al refrescar la app (reanudar / eventos USB).</string>
 </resources>

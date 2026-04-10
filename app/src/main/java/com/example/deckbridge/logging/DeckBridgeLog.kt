@@ -17,7 +17,9 @@ import com.example.deckbridge.domain.hardware.HardwareMirrorHighlight
  * - `[PERF]` — pipeline timings (match → state apply), throttled
  * - `[CAL]` — calibration wizard steps and skips
  * - `[KNOB]` — knob matched → logical intent / tile / dispatch
- * - `[ACTION]` — resolved shortcut dispatch (no HID yet)
+ * - `[ACTION]` — resolved shortcut dispatch (logging fallback / audit)
+ * - `[HID]` — USB gadget HID transport (probe with paths exists/writable, diagnosis when NO_NODES,
+ *   skip reasons before `[ACTION]` fallback, successful report sends)
  */
 object DeckBridgeLog {
     const val TAG = "DeckBridge"
@@ -62,6 +64,10 @@ object DeckBridgeLog {
 
     fun action(message: String) {
         Log.i(TAG, "[ACTION] $message")
+    }
+
+    fun hid(message: String) {
+        Log.i(TAG, "[HID] $message")
     }
 
     /** Verbose per-key / motion line — DEBUG builds only (avoids Logcat spam). */

@@ -7,4 +7,13 @@ enum class HostPlatform {
     WINDOWS,
     MAC,
     UNKNOWN,
+    ;
+
+    /**
+     * Deck layout, bindings, and chord resolution fallback when the OS is not chosen yet.
+     */
+    fun coerceForDeckData(): HostPlatform = when (this) {
+        UNKNOWN -> WINDOWS
+        else -> this
+    }
 }

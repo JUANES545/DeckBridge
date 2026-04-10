@@ -6,8 +6,10 @@ import com.example.deckbridge.R
 import com.example.deckbridge.domain.PlatformActionResolver
 import com.example.deckbridge.domain.model.AppState
 import com.example.deckbridge.domain.model.DeckButtonIntent
+import com.example.deckbridge.domain.model.HidTransportUiState
 import com.example.deckbridge.domain.model.HostConnectionStatus
 import com.example.deckbridge.domain.model.HostPlatform
+import com.example.deckbridge.domain.model.HostPlatformSource
 import com.example.deckbridge.domain.model.HostUsbConnectionState
 import com.example.deckbridge.domain.model.InputDiagnostics
 import com.example.deckbridge.domain.model.MacroButton
@@ -45,23 +47,24 @@ object DeckCatalog {
         Slot("btn_mute", R.string.deck_action_mute, DeckButtonIntent.SystemMedia.Mute, 8, "volume_mute"),
     )
 
-    fun profileFor(platform: HostPlatform, res: Resources): Profile {
-        val p = platform.coerce()
-        return when (p) {
-            HostPlatform.MAC -> Profile(id = PROFILE_MAC_ID, name = res.getString(R.string.profile_name_mac), isDefault = true)
-            HostPlatform.WINDOWS -> Profile(id = PROFILE_WINDOWS_ID, name = res.getString(R.string.profile_name_windows), isDefault = true)
-            HostPlatform.UNKNOWN -> Profile(id = PROFILE_WINDOWS_ID, name = res.getString(R.string.profile_name_windows), isDefault = true)
-        }
+    fun profileFor(platform: HostPlatform, res: Resources): Profile = when (platform) {
+        HostPlatform.MAC -> Profile(id = PROFILE_MAC_ID, name = res.getString(R.string.profile_name_mac), isDefault = true)
+        HostPlatform.WINDOWS -> Profile(id = PROFILE_WINDOWS_ID, name = res.getString(R.string.profile_name_windows), isDefault = true)
+        HostPlatform.UNKNOWN -> Profile(
+            id = PROFILE_WINDOWS_ID,
+            name = res.getString(R.string.profile_name_unknown),
+            isDefault = true,
+        )
     }
 
-    fun profileIdFor(platform: HostPlatform): String = when (platform.coerce()) {
+    fun profileIdFor(platform: HostPlatform): String = when (platform.coerceForDeckData()) {
         HostPlatform.MAC -> PROFILE_MAC_ID
         HostPlatform.WINDOWS, HostPlatform.UNKNOWN -> PROFILE_WINDOWS_ID
     }
 
     /** @throws android.content.res.Resources.NotFoundException if [res] is invalid */
     fun macroButtonsFor(platform: HostPlatform, res: Resources): List<MacroButton> {
-        val p = platform.coerce()
+        val p = platform.coerceForDeckData()
         return slots.map { slot ->
             val resolved = PlatformActionResolver.resolve(slot.intent, p)
             MacroButton(
@@ -92,9 +95,10 @@ object DeckCatalog {
 
     /** Baseline [AppState] before runtime/input overlays (used by mocks + cold start). */
     fun baseDeckAppState(hostPlatform: HostPlatform, res: Resources): AppState {
-        val p = hostPlatform.coerce()
         return AppState(
-            hostPlatform = p,
+            hostPlatform = hostPlatform,
+            hostPlatformSource = HostPlatformSource.MANUAL,
+            hostDetectionDetail = res.getString(R.string.host_detect_manual),
             physicalKeyboard = PhysicalKeyboardStatus(
                 state = PhysicalKeyboardConnectionState.DISCONNECTED,
                 deviceName = null,
@@ -105,9 +109,9 @@ object DeckCatalog {
                 hostLabel = res.getString(R.string.host_default_label),
                 detail = res.getString(R.string.host_usb_detail_placeholder),
             ),
-            activeProfile = profileFor(p, res),
-            macroButtons = macroButtonsFor(p, res),
-            physicalBindingsPreview = physicalBindingsFor(p),
+            activeProfile = profileFor(hostPlatform, res),
+            macroButtons = macroButtonsFor(hostPlatform, res),
+            physicalBindingsPreview = physicalBindingsFor(hostPlatform),
             inputDiagnostics = InputDiagnostics(
                 lastEventDevice = null,
                 lastEventAtEpochMs = null,
@@ -124,21 +128,19 @@ object DeckCatalog {
             hardwareMirrorHighlight = null,
             hardwareDiagSummary = null,
             rawInputDiagnostics = emptyList(),
+            hidTransport = HidTransportUiState.initial(
+                summary = res.getString(R.string.hid_transport_summary_not_probed),
+                detail = res.getString(R.string.hid_transport_detail_default),
+            ),
         )
     }
 
     fun withHostPlatform(prev: AppState, platform: HostPlatform, res: Resources): AppState {
-        val p = platform.coerce()
         return prev.copy(
-            hostPlatform = p,
-            activeProfile = profileFor(p, res),
-            macroButtons = macroButtonsFor(p, res),
-            physicalBindingsPreview = physicalBindingsFor(p),
+            hostPlatform = platform,
+            activeProfile = profileFor(platform, res),
+            macroButtons = macroButtonsFor(platform, res),
+            physicalBindingsPreview = physicalBindingsFor(platform),
         )
-    }
-
-    private fun HostPlatform.coerce(): HostPlatform = when (this) {
-        HostPlatform.UNKNOWN -> HostPlatform.WINDOWS
-        else -> this
     }
 }
