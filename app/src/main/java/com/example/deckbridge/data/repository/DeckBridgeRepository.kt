@@ -35,6 +35,12 @@ interface DeckBridgeRepository {
     /** Persists and reapplies deck layout for the selected host OS (Windows / macOS). */
     fun setHostPlatform(platform: HostPlatform)
 
+    /** When true, host platform follows [HostOsDetector] (usually UNKNOWN + manual hint). */
+    fun setHostAutoDetect(enabled: Boolean)
+
+    /** Re-probes USB gadget HID nodes and host USB stickiness; call on resume / USB events. */
+    fun refreshHostAndTransport()
+
     /** Starts the guided hardware calibration wizard (foreground + physical device). */
     fun startHardwareCalibration()
 

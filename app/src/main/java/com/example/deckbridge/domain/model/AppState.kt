@@ -11,6 +11,10 @@ import com.example.deckbridge.profiles.Profile
  */
 data class AppState(
     val hostPlatform: HostPlatform,
+    /** How [hostPlatform] was chosen (manual chips vs automatic detection). */
+    val hostPlatformSource: HostPlatformSource,
+    /** Short explanation for Settings (detection result or manual hint). */
+    val hostDetectionDetail: String,
     val physicalKeyboard: PhysicalKeyboardStatus,
     val hostConnection: HostConnectionStatus,
     val activeProfile: Profile,
@@ -31,4 +35,6 @@ data class AppState(
     val hardwareDiagSummary: HardwareDiagSummary?,
     /** Raw KEY/MOTION lines for deep debugging (capped in repository). */
     val rawInputDiagnostics: List<RawDiagnosticLine>,
+    /** USB gadget HID transport (keyboard / consumer); usually unavailable without root + gadget. */
+    val hidTransport: HidTransportUiState,
 )

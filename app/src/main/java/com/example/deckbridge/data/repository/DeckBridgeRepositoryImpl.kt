@@ -11,14 +11,17 @@ import android.view.MotionEvent
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import com.example.deckbridge.R
+import com.example.deckbridge.actions.HidTransportDispatcher
 import com.example.deckbridge.actions.ActionDispatcher
 import com.example.deckbridge.data.deck.DeckCatalog
 import com.example.deckbridge.data.hardware.HardwareBridge
 import com.example.deckbridge.data.hardware.HardwareCalibrationJson
 import com.example.deckbridge.data.mock.MockAppStateFactory
 import com.example.deckbridge.data.preferences.readHardwareCalibrationJson
+import com.example.deckbridge.data.preferences.readHostAutoDetect
 import com.example.deckbridge.data.preferences.readPersistedHostPlatform
 import com.example.deckbridge.data.preferences.writeHardwareCalibrationJson
+import com.example.deckbridge.data.preferences.writeHostAutoDetect
 import com.example.deckbridge.data.preferences.writePersistedHostPlatform
 import com.example.deckbridge.domain.PlatformActionResolver
 import com.example.deckbridge.domain.model.DeckButtonIntent
@@ -29,7 +32,10 @@ import com.example.deckbridge.domain.model.ButtonTriggerSource
 import com.example.deckbridge.domain.model.DECK_HIGHLIGHT_DURATION_MS
 import com.example.deckbridge.domain.model.DeckActivationLogEntry
 import com.example.deckbridge.domain.model.DeckButtonHighlight
+import com.example.deckbridge.domain.model.HostConnectionStatus
 import com.example.deckbridge.domain.model.HostPlatform
+import com.example.deckbridge.domain.model.HostPlatformSource
+import com.example.deckbridge.domain.model.HostUsbConnectionState
 import com.example.deckbridge.domain.model.InputDeviceSnapshot
 import com.example.deckbridge.domain.model.KeyboardInputClassification
 import com.example.deckbridge.domain.model.PhysicalKeyboardConnectionState
@@ -38,7 +44,10 @@ import com.example.deckbridge.domain.model.macroButtonIdForKeyCode
 import com.example.deckbridge.input.InputDeviceSnapshotFactory
 import com.example.deckbridge.input.KeyboardCaptureRules
 import com.example.deckbridge.input.KeyboardKeyFormatter
+import com.example.deckbridge.hid.HidGadgetSession
+import com.example.deckbridge.host.HostOsDetector
 import com.example.deckbridge.logging.DeckBridgeLog
+import com.example.deckbridge.transport.HidTransportUiMapper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -54,9 +63,12 @@ import java.util.UUID
 class DeckBridgeRepositoryImpl(
     appContext: Context,
     private val externalScope: CoroutineScope,
-    private val actionDispatcher: ActionDispatcher,
+    private val hidTransportDispatcher: HidTransportDispatcher,
+    private val hidGadgetSession: HidGadgetSession,
     private val dataStore: DataStore<Preferences>,
 ) : DeckBridgeRepository {
+
+    private val actionDispatcher: ActionDispatcher = hidTransportDispatcher
 
     private val app = appContext.applicationContext
     private val res = app.resources
@@ -72,6 +84,7 @@ class DeckBridgeRepositoryImpl(
     private var mirrorClearJob: Job? = null
     private var keyboardScanJob: Job? = null
     private var deviceRefreshJob: Job? = null
+    private var hostTransportRefreshJob: Job? = null
 
     @Volatile
     private var lastKeyboardScanElapsedRealtime: Long = 0L
@@ -108,11 +121,7 @@ class DeckBridgeRepositoryImpl(
     init {
         inputManager.registerInputDeviceListener(inputDeviceListener, mainHandler)
 
-        externalScope.launch {
-            val stored = dataStore.readPersistedHostPlatform()
-            DeckBridgeLog.state("loaded hostPlatform=$stored (applying deck profile)")
-            _appState.update { prev -> DeckCatalog.withHostPlatform(prev, stored, res) }
-        }
+        scheduleHostAndTransportRefresh()
         externalScope.launch {
             val json = dataStore.readHardwareCalibrationJson()
             val cfg = HardwareCalibrationJson.decode(json)
@@ -392,15 +401,126 @@ class DeckBridgeRepositoryImpl(
     }
 
     override fun setHostPlatform(platform: HostPlatform) {
-        val target = when (platform) {
-            HostPlatform.UNKNOWN -> HostPlatform.WINDOWS
-            else -> platform
-        }
         externalScope.launch {
-            dataStore.writePersistedHostPlatform(target)
-            DeckBridgeLog.state("hostPlatform set=$target (deck profile + shortcuts)")
-            _appState.update { prev -> DeckCatalog.withHostPlatform(prev, target, res) }
+            dataStore.writeHostAutoDetect(false)
+            dataStore.writePersistedHostPlatform(platform)
+            DeckBridgeLog.state("hostPlatform set=$platform source=MANUAL")
+            _appState.update { prev ->
+                DeckCatalog.withHostPlatform(prev, platform, res).copy(
+                    hostPlatformSource = HostPlatformSource.MANUAL,
+                    hostDetectionDetail = app.getString(R.string.host_detect_manual),
+                )
+            }
         }
+    }
+
+    override fun setHostAutoDetect(enabled: Boolean) {
+        externalScope.launch {
+            dataStore.writeHostAutoDetect(enabled)
+            if (enabled) {
+                refreshHostAndTransportInternal(forceAuto = true)
+            } else {
+                val p = _appState.value.hostPlatform
+                dataStore.writePersistedHostPlatform(p)
+                _appState.update { prev ->
+                    prev.copy(
+                        hostPlatformSource = HostPlatformSource.MANUAL,
+                        hostDetectionDetail = app.getString(R.string.host_detect_manual),
+                    )
+                }
+            }
+        }
+    }
+
+    override fun refreshHostAndTransport() {
+        scheduleHostAndTransportRefresh()
+    }
+
+    /** Coalesces init + onResume + USB_STATE bursts into one probe (same result, less Logcat noise). */
+    private fun scheduleHostAndTransportRefresh() {
+        hostTransportRefreshJob?.cancel()
+        hostTransportRefreshJob = externalScope.launch {
+            delay(HOST_TRANSPORT_DEBOUNCE_MS)
+            refreshHostAndTransportInternal()
+        }
+    }
+
+    private suspend fun refreshHostAndTransportInternal(forceAuto: Boolean = false) {
+        val auto = forceAuto || dataStore.readHostAutoDetect()
+        val probe = withContext(Dispatchers.IO) { hidGadgetSession.probe() }
+        hidTransportDispatcher.updateTransportState(probe.keyboardWritable, probe.consumerWritable)
+        DeckBridgeLog.hid(
+            "probe phase=${probe.phase} | keyboard path=${probe.keyboardPath} exists=${probe.keyboardExists} writable=${probe.keyboardWritable} | consumer path=${probe.consumerPath} exists=${probe.consumerExists} writable=${probe.consumerWritable} | err=${probe.lastError}",
+        )
+        when {
+            !probe.keyboardExists && !probe.consumerExists -> {
+                DeckBridgeLog.hid(app.getString(R.string.hid_log_diagnose_no_nodes))
+            }
+            probe.keyboardExists && !probe.keyboardWritable -> {
+                DeckBridgeLog.hid(
+                    app.getString(
+                        R.string.hid_log_diagnose_keyboard_denied,
+                        probe.lastError ?: "—",
+                    ),
+                )
+            }
+            probe.keyboardWritable && (!probe.consumerExists || !probe.consumerWritable) -> {
+                DeckBridgeLog.hid(
+                    app.getString(R.string.hid_log_diagnose_media_only, probe.consumerPath),
+                )
+            }
+        }
+        val hidUi = HidTransportUiMapper.toUiState(probe, res)
+        val usbConnected = HostOsDetector.peekUsbConnected(app)
+        if (auto) {
+            val det = HostOsDetector.detect(usbConnected)
+            val detail = hostAutoDetail(det)
+            DeckBridgeLog.state("host auto-detect platform=${det.platform} usb=$usbConnected")
+            _appState.update { prev ->
+                DeckCatalog.withHostPlatform(prev, det.platform, res).copy(
+                    hostPlatformSource = HostPlatformSource.AUTOMATIC,
+                    hostDetectionDetail = detail,
+                    hidTransport = hidUi,
+                    hostConnection = mergeHostUsb(prev.hostConnection, usbConnected, probe.keyboardWritable),
+                )
+            }
+        } else {
+            val stored = dataStore.readPersistedHostPlatform()
+            DeckBridgeLog.state("loaded hostPlatform=$stored (manual)")
+            _appState.update { prev ->
+                DeckCatalog.withHostPlatform(prev, stored, res).copy(
+                    hostPlatformSource = HostPlatformSource.MANUAL,
+                    hostDetectionDetail = app.getString(R.string.host_detect_manual),
+                    hidTransport = hidUi,
+                    hostConnection = mergeHostUsb(prev.hostConnection, usbConnected, probe.keyboardWritable),
+                )
+            }
+        }
+    }
+
+    private fun hostAutoDetail(det: HostOsDetector.Result): String = when (det.detailKey) {
+        HostOsDetector.DetailKey.USB_NOT_CONNECTED ->
+            app.getString(R.string.host_detect_usb_disconnected)
+        HostOsDetector.DetailKey.USB_CONNECTED_OS_UNKNOWN ->
+            app.getString(R.string.host_detect_usb_unknown_os)
+    }
+
+    private fun mergeHostUsb(
+        prev: HostConnectionStatus,
+        usbConnected: Boolean,
+        hidKeyboardReady: Boolean,
+    ): HostConnectionStatus {
+        val usbState = when {
+            !usbConnected -> HostUsbConnectionState.NOT_CONNECTED
+            hidKeyboardReady -> HostUsbConnectionState.READY
+            else -> HostUsbConnectionState.ATTACHED_IDLE
+        }
+        val detail = when {
+            !usbConnected -> app.getString(R.string.usb_state_not_connected)
+            hidKeyboardReady -> app.getString(R.string.host_usb_hid_ready)
+            else -> app.getString(R.string.host_usb_attached_no_hid)
+        }
+        return prev.copy(usbState = usbState, detail = detail)
     }
 
     override fun triggerDeckButton(buttonId: String, source: ButtonTriggerSource) {
@@ -541,6 +661,7 @@ class DeckBridgeRepositoryImpl(
         private const val KEYBOARD_SCAN_MIN_INTERVAL_MS = 900L
         private const val MIRROR_CLEAR_MAX_WAIT_MS = 400L
         private const val DEVICE_REFRESH_DEBOUNCE_MS = 400L
+        private const val HOST_TRANSPORT_DEBOUNCE_MS = 280L
         private const val KNOB_MOTION_THROTTLE_MS = 220L
     }
 }

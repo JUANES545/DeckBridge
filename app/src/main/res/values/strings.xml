@@ -1,8 +1,5 @@
 <resources>
     <string name="app_name">DeckBridge</string>
-    <string name="home_subtitle">Macro deck bridge · Wi‑Fi debug</string>
-    <string name="home_hero_title">Live deck</string>
-    <string name="home_hero_subtitle">Mirrors your calibrated hardware in real time.</string>
 
     <string name="section_system_status">System status</string>
     <string name="section_host_platform_deck">Host platform (shortcuts)</string>
@@ -114,7 +111,6 @@
     <string name="knob_generic">Knob %d</string>
     <string name="pad_cell_short">%1$d·%2$d</string>
     <string name="home_open_calibration">Adjust calibration</string>
-    <string name="hardware_mirror_hint">Knobs on the left match your device; each pad slot can show media and shortcuts after you calibrate.</string>
     <string name="status_strip_keyboard_off">No keyboard</string>
     <string name="status_strip_platform">Host: %s</string>
 
@@ -150,6 +146,7 @@
 
     <string name="profile_name_windows">Windows</string>
     <string name="profile_name_mac">macOS</string>
+    <string name="profile_name_unknown">Unknown host</string>
     <string name="deck_action_copy">Copy</string>
     <string name="deck_action_paste">Paste</string>
     <string name="deck_action_vol_up">Vol +</string>
@@ -170,7 +167,7 @@
     <string name="settings_back">Back</string>
     <string name="fab_open_settings">Open diagnostics and logs</string>
     <string name="settings_logcat_hint_title">Logcat</string>
-    <string name="settings_logcat_hint_body">Tag: DeckBridge · Lines: [STATE] [INPUT] [MATCH] [UI] [PERF] [CAL] [KNOB] [ACTION] · Verbose keys: DEBUG builds only · adb logcat -s DeckBridge</string>
+    <string name="settings_logcat_hint_body">Tag: DeckBridge · Lines: [STATE] [INPUT] [MATCH] [UI] [PERF] [CAL] [KNOB] [ACTION] [HID] · Verbose keys: DEBUG builds only · adb logcat -s DeckBridge</string>
 
     <string name="settings_section_session">Live hardware</string>
     <string name="settings_last_control_none">No match yet. Use the deck; lines also appear in Logcat as [MATCH].</string>
@@ -183,10 +180,40 @@
     <string name="settings_bind_yes">yes</string>
     <string name="settings_bind_no">no</string>
     <string name="settings_section_keyboard_host">Keyboard &amp; host</string>
+    <string name="settings_section_hid_host">USB HID to PC</string>
+    <string name="settings_host_auto_detect">Automatic host detection</string>
+    <string name="settings_host_auto_detect_hint">Experimental. Android cannot read Windows vs macOS from USB alone; you will often get “Unknown” and should pick the platform manually on the home screen.</string>
+    <string name="settings_host_source_manual">Host: manual selection</string>
+    <string name="settings_host_source_auto">Host: automatic (heuristic)</string>
+    <string name="settings_hid_transport">HID transport</string>
+    <string name="settings_hid_keyboard">Keyboard gadget</string>
+    <string name="settings_hid_consumer">Media / consumer gadget</string>
+    <string name="hid_transport_summary_not_probed">Not probed yet</string>
+    <string name="hid_transport_summary_probing">Probing…</string>
+    <string name="hid_transport_summary_no_nodes">Not available (no /dev/hidg*)</string>
+    <string name="hid_transport_summary_denied">Gadget present · access denied</string>
+    <string name="hid_transport_summary_keyboard_ready">Keyboard HID ready</string>
+    <string name="hid_transport_summary_full_ready">Keyboard + media HID ready</string>
+    <string name="hid_transport_summary_error">HID error</string>
+    <string name="hid_transport_detail_default">Real output to a tethered PC needs a USB gadget with HID enabled (root, custom kernel, or configfs). Retail phones usually expose MTP/ADB only — DeckBridge still runs; watch [HID] and [ACTION] in Logcat.</string>
+    <string name="hid_transport_paths">Keyboard: %1$s · Consumer: %2$s</string>
+    <string name="hid_transport_nodes_line">Probe: keyboard %1$s · consumer %2$s</string>
+    <string name="hid_node_state_missing">missing</string>
+    <string name="hid_node_state_writable">writable</string>
+    <string name="hid_node_state_present_blocked">present, not writable</string>
+    <string name="hid_transport_last_error">Last error: %s</string>
+    <string name="hid_log_diagnose_no_nodes">Diagnosis: no /dev/hidg* nodes. A USB cable to Windows (charging/MTP/ADB) does not make this phone a HID keyboard. The PC will not receive DeckBridge keys until the device exposes gadget HID (custom kernel / configfs — often root). [ACTION] lines are fallback only.</string>
+    <string name="hid_log_diagnose_keyboard_denied">Diagnosis: keyboard HID node exists but this app cannot write it (SELinux/permissions). %1$s</string>
+    <string name="hid_log_diagnose_media_only">Diagnosis: keyboard HID works; volume/media skipped — no writable consumer node at %1$s</string>
+    <string name="host_detect_manual">Platform chosen manually on the home screen.</string>
+    <string name="host_detect_usb_disconnected">USB not connected to a host (or state unavailable).</string>
+    <string name="host_detect_usb_unknown_os">USB connected; host OS cannot be determined on standard Android. Choose Windows or macOS manually for correct shortcuts.</string>
+    <string name="host_usb_hid_ready">USB connected · HID keyboard endpoint writable</string>
+    <string name="host_usb_attached_no_hid">USB connected · HID gadget not available to the app</string>
     <string name="settings_raw_tail">Recent raw lines</string>
     <string name="settings_raw_tail_subtitle">Same channel as Logcat [INPUT]; tail trimmed here.</string>
     <string name="settings_activations_recent">Recent deck activations</string>
 
     <string name="host_default_label">Work PC (Win 11)</string>
-    <string name="host_usb_detail_placeholder">USB host/agent not implemented yet · live status will appear here</string>
+    <string name="host_usb_detail_placeholder">USB status updates when the app refreshes (resume / USB events).</string>
 </resources>

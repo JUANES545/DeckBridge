@@ -26,6 +26,14 @@ class MainViewModel(
         repository.refreshAttachedKeyboards()
     }
 
+    fun setHostAutoDetect(enabled: Boolean) {
+        repository.setHostAutoDetect(enabled)
+    }
+
+    fun refreshHostAndTransport() {
+        repository.refreshHostAndTransport()
+    }
+
     companion object {
         fun factory(repository: DeckBridgeRepository): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {

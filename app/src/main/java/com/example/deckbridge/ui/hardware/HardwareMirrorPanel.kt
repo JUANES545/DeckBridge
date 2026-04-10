@@ -46,6 +46,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.deckbridge.R
 import com.example.deckbridge.domain.PlatformActionResolver
@@ -65,7 +66,11 @@ fun HardwareMirrorPanel(
     padSlots: List<MirrorPadSlot>,
     hostPlatform: HostPlatform,
     modifier: Modifier = Modifier,
+    maxContentWidth: Dp? = 520.dp,
+    showKnobRoleHints: Boolean = true,
+    layoutDensity: MirrorLayoutDensity = MirrorLayoutDensity.Comfortable,
 ) {
+    val tokens = layoutDensity.toTokens()
     val now = System.currentTimeMillis()
     val activeHighlight = highlight?.takeIf { it.untilEpochMs > now }
     val slots = if (padSlots.size >= 9) padSlots.take(9) else {
@@ -73,13 +78,23 @@ fun HardwareMirrorPanel(
             MirrorPadSlot("", "—", null)
         }
     }
+    val cardShape = RoundedCornerShape(tokens.cardCorner)
 
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .widthIn(max = 520.dp),
-        shape = RoundedCornerShape(28.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp, pressedElevation = 6.dp),
+            .then(
+                if (maxContentWidth != null) {
+                    Modifier.widthIn(max = maxContentWidth)
+                } else {
+                    Modifier
+                },
+            ),
+        shape = cardShape,
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = tokens.cardElevation,
+            pressedElevation = tokens.cardElevation,
+        ),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ),
@@ -96,25 +111,32 @@ fun HardwareMirrorPanel(
                             MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
                         ),
                     ),
-                    shape = RoundedCornerShape(28.dp),
+                    shape = cardShape,
                 )
-                .padding(horizontal = 18.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+                .padding(
+                    horizontal = tokens.paddingHorizontal,
+                    vertical = tokens.paddingVertical,
+                ),
+            verticalArrangement = Arrangement.spacedBy(tokens.sectionGap),
         ) {
             LastInteractionLine(
                 calibration = calibration,
                 diagSummary = diagSummary,
                 padSlots = slots,
                 hostPlatform = hostPlatform,
+                compact = !showKnobRoleHints,
+                denseTypography = tokens.statusIsDenseTypography,
+                headerExtraDense = tokens.headerExtraDense,
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                horizontalArrangement = Arrangement.spacedBy(tokens.knobPadRowGap),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                val padWeight = 1f - tokens.knobColumnWeight
                 Column(
                     modifier = Modifier
-                        .weight(0.26f)
+                        .weight(tokens.knobColumnWeight)
                         .fillMaxHeight(),
                     verticalArrangement = Arrangement.SpaceEvenly,
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -125,18 +147,19 @@ fun HardwareMirrorPanel(
                             label = knobUserLabel(index),
                             roleHint = knobRoleHint(index),
                             activeHighlight = activeHighlight,
+                            showRoleHint = showKnobRoleHints,
+                            tokens = tokens,
                         )
                     }
                 }
                 Column(
-                    modifier = Modifier
-                        .weight(0.74f),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.weight(padWeight),
+                    verticalArrangement = Arrangement.spacedBy(tokens.padCellGap),
                 ) {
                     for (r in 0..2) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(tokens.padCellGap),
                         ) {
                             for (c in 0..2) {
                                 val idx = r * 3 + c
@@ -144,9 +167,10 @@ fun HardwareMirrorPanel(
                                     slot = slots[idx],
                                     padId = HardwareControlId.PadKey(r, c),
                                     activeHighlight = activeHighlight,
+                                    tokens = tokens,
                                     modifier = Modifier
                                         .weight(1f)
-                                        .aspectRatio(1f),
+                                        .aspectRatio(tokens.padCellAspectRatio),
                                 )
                             }
                         }
@@ -163,11 +187,30 @@ private fun LastInteractionLine(
     diagSummary: HardwareDiagSummary?,
     padSlots: List<MirrorPadSlot>,
     hostPlatform: HostPlatform,
+    compact: Boolean = false,
+    denseTypography: Boolean = false,
+    headerExtraDense: Boolean = false,
 ) {
     val calibOk = calibration != null && calibration.isComplete
+    val statusStyle = when {
+        headerExtraDense -> MaterialTheme.typography.labelSmall
+        denseTypography -> MaterialTheme.typography.labelMedium
+        else -> MaterialTheme.typography.labelLarge
+    }
+    val detailStyle = when {
+        headerExtraDense -> MaterialTheme.typography.labelSmall
+        denseTypography -> MaterialTheme.typography.labelSmall
+        else -> MaterialTheme.typography.bodySmall
+    }
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(
+            when {
+                headerExtraDense -> 6.dp
+                denseTypography -> 8.dp
+                else -> 12.dp
+            },
+        ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -176,7 +219,7 @@ private fun LastInteractionLine(
             } else {
                 stringResource(R.string.mirror_status_setup)
             },
-            style = MaterialTheme.typography.labelLarge,
+            style = statusStyle,
             color = if (calibOk) {
                 MaterialTheme.colorScheme.primary
             } else {
@@ -186,9 +229,9 @@ private fun LastInteractionLine(
         diagSummary?.let { s ->
             Text(
                 text = userFacingInteractionLine(s, padSlots, hostPlatform),
-                style = MaterialTheme.typography.bodySmall,
+                style = detailStyle,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
+                maxLines = if (compact) 1 else 2,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.End,
                 modifier = Modifier.weight(1f),
@@ -264,6 +307,8 @@ private fun KnobVisual(
     label: String,
     roleHint: String,
     activeHighlight: HardwareMirrorHighlight?,
+    showRoleHint: Boolean = true,
+    tokens: MirrorLayoutTokens,
 ) {
     val knobId = HardwareControlId.Knob(index)
     val h = activeHighlight
@@ -312,18 +357,50 @@ private fun KnobVisual(
         isPressUp -> MaterialTheme.colorScheme.secondary
         else -> MaterialTheme.colorScheme.primary.copy(alpha = 0.88f)
     }
+    val denseKnobs = tokens.statusIsDenseTypography
+    val primary = tokens.useDistinctPrimaryKnob && index == 0
+    val outer = if (primary) tokens.knobPrimaryOuter else tokens.knobOuterBox
+    val inner = if (primary) tokens.knobPrimaryInner else tokens.knobInner
+    val dot = if (primary) tokens.knobPrimaryDot else tokens.knobDot
+    val arcStroke = if (primary) tokens.knobPrimaryArcStroke else tokens.knobArcStroke
+    val ringW = if (primary) tokens.knobPrimaryBorder else tokens.knobBorder
+    val shDown = when {
+        primary -> if (denseKnobs) 10.dp else 14.dp
+        denseKnobs -> 6.dp
+        else -> 14.dp
+    }
+    val shUp = when {
+        primary -> if (denseKnobs) 6.dp else 9.dp
+        denseKnobs -> 4.dp
+        else -> 9.dp
+    }
+    val shRot = when {
+        primary -> if (denseKnobs) 9.dp else 13.dp
+        denseKnobs -> 5.dp
+        else -> 13.dp
+    }
+    val shOn = when {
+        primary -> if (denseKnobs) 8.dp else 11.dp
+        denseKnobs -> 5.dp
+        else -> 11.dp
+    }
+    val shIdle = when {
+        primary -> if (denseKnobs) 3.dp else 4.dp
+        denseKnobs -> 2.dp
+        else -> 4.dp
+    }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(tokens.knobStackSpacing),
     ) {
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier.size(76.dp),
+            modifier = Modifier.size(outer),
         ) {
             if (isRotate) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                    val stroke = 3.dp.toPx()
+                    val stroke = arcStroke.toPx()
                     val r = size.minDimension / 2f - stroke
                     val center = Offset(size.width / 2f, size.height / 2f)
                     val start = if ((h?.rotationVisual ?: 0f) >= 0) -140f else -40f
@@ -341,16 +418,16 @@ private fun KnobVisual(
             }
             Box(
                 modifier = Modifier
-                    .size(58.dp)
+                    .size(inner)
                     .scale(scale)
                     .rotate(rotationDeg)
                     .shadow(
                         elevation = when {
-                            isPressDown -> 14.dp
-                            isPressUp -> 9.dp
-                            isRotate -> 13.dp
-                            isOn -> 11.dp
-                            else -> 4.dp
+                            isPressDown -> shDown
+                            isPressUp -> shUp
+                            isRotate -> shRot
+                            isOn -> shOn
+                            else -> shIdle
                         },
                         shape = CircleShape,
                         spotColor = MaterialTheme.colorScheme.primary.copy(
@@ -381,7 +458,7 @@ private fun KnobVisual(
                             )
                         },
                     )
-                    .border(2.5.dp, ringColor, CircleShape),
+                    .border(ringW, ringColor, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
                 val innerDotColor = when {
@@ -392,7 +469,7 @@ private fun KnobVisual(
                 }
                 Box(
                     modifier = Modifier
-                        .size(14.dp)
+                        .size(dot)
                         .scale(innerDotScale)
                         .clip(CircleShape)
                         .background(color = innerDotColor),
@@ -401,12 +478,17 @@ private fun KnobVisual(
         }
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall,
+            style = if (primary && tokens.useDistinctPrimaryKnob) {
+                MaterialTheme.typography.labelMedium
+            } else {
+                MaterialTheme.typography.labelSmall
+            },
+            fontWeight = if (primary && tokens.useDistinctPrimaryKnob) FontWeight.SemiBold else FontWeight.Normal,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        if (roleHint.isNotBlank()) {
+        if (showRoleHint && roleHint.isNotBlank()) {
             Text(
                 text = roleHint,
                 style = MaterialTheme.typography.labelSmall,
@@ -414,7 +496,13 @@ private fun KnobVisual(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.widthIn(max = 92.dp),
+                modifier = Modifier.widthIn(
+                    max = when {
+                        primary -> 88.dp
+                        denseKnobs -> 72.dp
+                        else -> 92.dp
+                    },
+                ),
             )
         }
     }
@@ -425,6 +513,7 @@ private fun PadKeyTile(
     slot: MirrorPadSlot,
     padId: HardwareControlId.PadKey,
     activeHighlight: HardwareMirrorHighlight?,
+    tokens: MirrorLayoutTokens,
     modifier: Modifier = Modifier,
 ) {
     val isOn = activeHighlight?.control == padId
@@ -436,7 +525,21 @@ private fun PadKeyTile(
         ),
         label = "padScale${padId.row}${padId.col}",
     )
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(tokens.padCorner)
+    val densePads = tokens.statusIsDenseTypography
+    val shadowActive = if (densePads) 8.dp else 14.dp
+    val shadowIdle = if (densePads) 2.dp else 3.dp
+    val glyphStyle = when {
+        tokens.padGlyphProminent && densePads -> MaterialTheme.typography.titleLarge
+        tokens.padTitleMinimal && densePads -> MaterialTheme.typography.titleSmall
+        densePads -> MaterialTheme.typography.titleMedium
+        else -> MaterialTheme.typography.headlineSmall
+    }
+    val titleTypo = if (tokens.padTitleMinimal) {
+        MaterialTheme.typography.labelSmall
+    } else {
+        MaterialTheme.typography.labelMedium
+    }
     val baseBg = MaterialTheme.colorScheme.surfaceContainerHighest
     val activeBg = lerp(
         MaterialTheme.colorScheme.primaryContainer,
@@ -451,29 +554,32 @@ private fun PadKeyTile(
             modifier = Modifier
                 .fillMaxSize()
                 .shadow(
-                    elevation = if (isOn) 14.dp else 3.dp,
+                    elevation = if (isOn) shadowActive else shadowIdle,
                     shape = shape,
                     spotColor = MaterialTheme.colorScheme.primary.copy(alpha = if (isOn) 0.5f else 0.08f),
                 )
                 .clip(shape)
                 .background(if (isOn) activeBg else baseBg)
                 .border(
-                    width = if (isOn) 2.dp else 1.dp,
+                    width = if (isOn) tokens.padBorderActive else tokens.padBorderIdle,
                     color = if (isOn) borderActive else borderIdle,
                     shape = shape,
                 )
-                .padding(horizontal = 6.dp, vertical = 5.dp),
+                .padding(
+                    horizontal = tokens.padPaddingH,
+                    vertical = tokens.padPaddingV,
+                ),
         ) {
             Column(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(tokens.padColumnGap),
             ) {
                 // Media / thumbnail region — replace with AsyncImage / SubcomposeAsyncImage later
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f)
-                        .clip(RoundedCornerShape(12.dp))
+                        .weight(1f, fill = true)
+                        .clip(RoundedCornerShape(tokens.padMediaCorner))
                         .background(
                             brush = Brush.linearGradient(
                                 colors = listOf(
@@ -486,12 +592,12 @@ private fun PadKeyTile(
                 ) {
                     Text(
                         text = mirrorSlotGlyph(slot.iconToken),
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = glyphStyle,
                     )
                 }
                 Text(
                     text = slot.title.ifBlank { "—" },
-                    style = MaterialTheme.typography.labelMedium,
+                    style = titleTypo,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

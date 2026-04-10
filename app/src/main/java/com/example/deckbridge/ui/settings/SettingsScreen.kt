@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -19,6 +20,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -37,6 +39,7 @@ import com.example.deckbridge.domain.model.AppState
 import com.example.deckbridge.domain.model.ButtonTriggerSource
 import com.example.deckbridge.domain.model.DeckActivationLogEntry
 import com.example.deckbridge.domain.model.HostPlatform
+import com.example.deckbridge.domain.model.HostPlatformSource
 import com.example.deckbridge.domain.model.HostUsbConnectionState
 import com.example.deckbridge.domain.model.PhysicalKeyboardConnectionState
 import java.text.DateFormat
@@ -49,6 +52,7 @@ fun SettingsScreen(
     state: AppState,
     onNavigateBack: () -> Unit,
     onRefreshKeyboards: () -> Unit,
+    onHostAutoDetectChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LaunchedEffect(Unit) {
@@ -93,6 +97,12 @@ fun SettingsScreen(
 
             SectionLabel(stringResource(R.string.settings_section_keyboard_host))
             KeyboardHostCompactCard(state = state)
+
+            SectionLabel(stringResource(R.string.settings_section_hid_host))
+            HostHidTransportCard(
+                state = state,
+                onHostAutoDetectChanged = onHostAutoDetectChanged,
+            )
 
             SectionLabel(stringResource(R.string.settings_raw_tail))
             RawTailCard(lines = state.rawInputDiagnostics)
@@ -218,6 +228,88 @@ private fun knobTitle(index: Int): String = when (index) {
     1 -> stringResource(R.string.knob_middle)
     2 -> stringResource(R.string.knob_bottom)
     else -> stringResource(R.string.knob_generic, index + 1)
+}
+
+@Composable
+private fun HostHidTransportCard(
+    state: AppState,
+    onHostAutoDetectChanged: (Boolean) -> Unit,
+) {
+    ElevatedInfoCard {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = stringResource(R.string.settings_host_auto_detect),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f).widthIn(max = 220.dp),
+            )
+            Switch(
+                checked = state.hostPlatformSource == HostPlatformSource.AUTOMATIC,
+                onCheckedChange = onHostAutoDetectChanged,
+            )
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = stringResource(R.string.settings_host_auto_detect_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(
+            text = if (state.hostPlatformSource == HostPlatformSource.AUTOMATIC) {
+                stringResource(R.string.settings_host_source_auto)
+            } else {
+                stringResource(R.string.settings_host_source_manual)
+            },
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = state.hostDetectionDetail,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            text = stringResource(R.string.settings_hid_transport),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = state.hidTransport.summary,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        StatusRow(
+            label = stringResource(R.string.settings_hid_keyboard),
+            value = stringResource(
+                if (state.hidTransport.canSendKeyboard) R.string.settings_bind_yes else R.string.settings_bind_no,
+            ),
+            positive = state.hidTransport.canSendKeyboard,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        StatusRow(
+            label = stringResource(R.string.settings_hid_consumer),
+            value = stringResource(
+                if (state.hidTransport.canSendMedia) R.string.settings_bind_yes else R.string.settings_bind_no,
+            ),
+            positive = state.hidTransport.canSendMedia,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = state.hidTransport.detail,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
 
 @Composable
