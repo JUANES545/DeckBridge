@@ -1,6 +1,8 @@
 <resources>
     <string name="app_name">DeckBridge</string>
-    <string name="home_subtitle">Per-platform shortcuts · DataStore</string>
+    <string name="home_subtitle">Macro deck bridge · Wi‑Fi debug</string>
+    <string name="home_hero_title">Live deck</string>
+    <string name="home_hero_subtitle">Mirrors your calibrated hardware in real time.</string>
 
     <string name="section_system_status">System status</string>
     <string name="section_host_platform_deck">Host platform (shortcuts)</string>
@@ -12,7 +14,10 @@
     <string name="section_host">Current host</string>
     <string name="section_future_actions">Upcoming actions</string>
     <string name="section_recent_events">Recent events</string>
-    <string name="section_deck_preview">Deck (3×3)</string>
+    <string name="section_deck_preview">On-screen deck</string>
+    <string name="section_technical_logs">Technical details &amp; logs</string>
+    <string name="technical_logs_expand">Show</string>
+    <string name="technical_logs_collapse">Hide</string>
     <string name="section_deck_activations">Deck activations</string>
 
     <string name="label_connection_state">Connection state</string>
@@ -83,5 +88,105 @@
     <string name="deck_tile_physical_none">Key: —</string>
     <string name="trigger_touch">Source: on-screen touch</string>
     <string name="trigger_hardware_key">Source: physical key</string>
+    <string name="trigger_hardware_knob">Source: hardware knob</string>
     <string name="trigger_simulated_activation">Source: simulated</string>
+
+    <string name="section_hardware_mirror">Hardware mirror</string>
+    <string name="hardware_mirror_status">Calibration: %s</string>
+    <string name="hardware_calibrated_yes">complete — pad + knobs learned</string>
+    <string name="hardware_calibrated_no">not complete — run calibration</string>
+    <string name="hardware_last_control">Last control: %1$s · %2$s</string>
+    <string name="mirror_status_ready">Ready</string>
+    <string name="mirror_status_setup">Setup needed</string>
+    <string name="mirror_last_interaction">%1$s · %2$s</string>
+    <string name="mirror_action_pad_press">Pressed</string>
+    <string name="mirror_action_knob_press">Pushed</string>
+    <string name="mirror_action_knob_release">Released</string>
+    <string name="mirror_knob_role_top">Vol − / Vol + · press: Play</string>
+    <string name="mirror_knob_role_middle">Copy / Paste</string>
+    <string name="mirror_knob_role_bottom">Prev / Next track</string>
+    <string name="mirror_action_knob_cw">Turned up</string>
+    <string name="mirror_action_knob_ccw">Turned down</string>
+    <string name="mirror_pad_fallback">Pad key</string>
+    <string name="knob_top">Top knob</string>
+    <string name="knob_middle">Middle knob</string>
+    <string name="knob_bottom">Bottom knob</string>
+    <string name="knob_generic">Knob %d</string>
+    <string name="pad_cell_short">%1$d·%2$d</string>
+    <string name="home_open_calibration">Adjust calibration</string>
+    <string name="hardware_mirror_hint">Knobs on the left match your device; each pad slot can show media and shortcuts after you calibrate.</string>
+    <string name="status_strip_keyboard_off">No keyboard</string>
+    <string name="status_strip_platform">Host: %s</string>
+
+    <string name="section_raw_diagnostics">Raw input log (keys + motion)</string>
+    <string name="raw_diagnostics_empty">No raw lines yet. Keys and scroll-style motion appear here.</string>
+    <string name="raw_diagnostics_line">%1$s · %2$s</string>
+
+    <string name="calibration_title">Hardware calibration</string>
+    <string name="calibration_back">Back</string>
+    <string name="calibration_saved_hint">Calibration saved. You can return to the home screen; the mirror will use this mapping.</string>
+    <string name="calibration_starting">Starting wizard…</string>
+    <string name="calibration_exit">Close wizard</string>
+    <string name="calibration_step_counter">Step %1$d of %2$d</string>
+    <string name="calibration_last_capture">Captured: %s</string>
+    <string name="calibration_step_pad">Press the physical key for pad cell row %1$d, column %2$d (row 1 = top, column 1 = left).</string>
+    <string name="calibration_step_knob_ccw">Turn %s one way (e.g. left / down). Send whatever key or scroll the device uses for that direction.</string>
+    <string name="calibration_step_knob_cw">Turn %s the opposite way (e.g. right / up). Use a different signal than the previous step.</string>
+    <string name="calibration_step_knob_press">Press %s once if it acts as a button. If Android never delivers a key for the press, tap “Skip press” — rotation mapping still works.</string>
+    <string name="calibration_motion_hint">Rotation: Android may deliver KeyEvents (e.g. volume) and/or MotionEvent scroll. Press: only works if the device exposes a distinct KeyEvent; many knobs never do.</string>
+    <string name="calibration_skip_press_button">Skip press</string>
+    <string name="calibration_skipped_press_summary">(press skipped)</string>
+    <string name="calibration_error_press_same_as_rotate">Use a different key for press than for rotation on this knob.</string>
+    <string name="calibration_error_knob_cw_key_on_ccw_step">That key is already used for the clockwise step on this knob. Turn the other way or pick another control.</string>
+    <string name="calibration_error_knob_ccw_key_on_cw_step">That key is already used for the counter‑clockwise step on this knob. Turn the other way or pick another control.</string>
+
+    <string name="calibration_error_duplicate_key">This key is already assigned. Press another.</string>
+    <string name="status_capture_active">Listening for hardware · Keep DeckBridge in the foreground while testing over Wi‑Fi</string>
+    <string name="physical_kb_detail_connected_scan">External keyboard detected (%1$d). Last id=%2$d</string>
+    <string name="physical_kb_detail_disconnected">No external keyboard with keyboard source. Connect USB or Bluetooth and reopen the app.</string>
+    <string name="physical_kb_detail_from_event">Event from external keyboard (deviceId=%1$d)</string>
+    <string name="input_hint_no_keyboards">No external keyboards listed yet. Keep the app in the foreground and try F1–F9 or your calibrated pad.</string>
+    <string name="input_hint_keyboards_summary">External keyboards: %1$d · Last: %2$s (id=%3$d)</string>
+
+    <string name="profile_name_windows">Windows</string>
+    <string name="profile_name_mac">macOS</string>
+    <string name="deck_action_copy">Copy</string>
+    <string name="deck_action_paste">Paste</string>
+    <string name="deck_action_vol_up">Vol +</string>
+    <string name="deck_action_play_pause">Play / Pause</string>
+    <string name="deck_action_search">Search</string>
+    <string name="deck_action_cut">Cut</string>
+    <string name="deck_action_undo">Undo</string>
+    <string name="deck_action_redo">Redo</string>
+    <string name="deck_action_mute">Mute</string>
+
+    <string name="mock_runtime_bootstrap_status">DeckBridge · Calibrated hardware mirror + host shortcuts</string>
+    <string name="mock_waiting_input_manager">Waiting for InputManager enumeration…</string>
+    <string name="mock_preview_input_hint">Preview: simulated macro keyboard connected.</string>
+    <string name="mock_preview_keyboard_detail">Simulated data for preview</string>
+    <string name="mock_preview_screen_status">Preview · Simulated hardware</string>
+
+    <string name="settings_title">Diagnostics &amp; logs</string>
+    <string name="settings_back">Back</string>
+    <string name="fab_open_settings">Open diagnostics and logs</string>
+    <string name="settings_logcat_hint_title">Logcat</string>
+    <string name="settings_logcat_hint_body">Tag: DeckBridge · Lines: [STATE] [INPUT] [MATCH] [UI] [PERF] [CAL] [KNOB] [ACTION] · Verbose keys: DEBUG builds only · adb logcat -s DeckBridge</string>
+
+    <string name="settings_section_session">Live hardware</string>
+    <string name="settings_last_control_none">No match yet. Use the deck; lines also appear in Logcat as [MATCH].</string>
+    <string name="settings_last_control_line">%1$s · %2$s</string>
+    <string name="settings_calibration_map">Saved mapping</string>
+    <string name="settings_calibration_device">Device: %s</string>
+    <string name="settings_calibration_device_unknown">Device: (not locked)</string>
+    <string name="settings_calibration_pads">Pad keys: %1$d / 9</string>
+    <string name="settings_knob_binding_line">%1$s: CCW keys %2$d · CW keys %3$d · motion %4$d · press %5$s</string>
+    <string name="settings_bind_yes">yes</string>
+    <string name="settings_bind_no">no</string>
+    <string name="settings_section_keyboard_host">Keyboard &amp; host</string>
+    <string name="settings_raw_tail">Recent raw lines</string>
+    <string name="settings_raw_tail_subtitle">Same channel as Logcat [INPUT]; tail trimmed here.</string>
+    <string name="settings_activations_recent">Recent deck activations</string>
+
+    <string name="host_default_label">Work PC (Win 11)</string>
+    <string name="host_usb_detail_placeholder">USB host/agent not implemented yet · live status will appear here</string>
 </resources>
