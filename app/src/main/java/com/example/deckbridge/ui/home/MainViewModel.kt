@@ -22,6 +22,10 @@ class MainViewModel(
         repository.setHostPlatform(platform)
     }
 
+    fun refreshAttachedKeyboards() {
+        repository.refreshAttachedKeyboards()
+    }
+
     companion object {
         fun factory(repository: DeckBridgeRepository): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {

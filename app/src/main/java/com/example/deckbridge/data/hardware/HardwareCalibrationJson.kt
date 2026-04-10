@@ -1,16 +1,19 @@
 package com.example.deckbridge.data.hardware
 
+import android.view.KeyEvent
 import com.example.deckbridge.domain.hardware.HardwareCalibrationConfig
 import com.example.deckbridge.domain.hardware.KnobCalibration
 import com.example.deckbridge.domain.hardware.PadCell
 import org.json.JSONArray
 import org.json.JSONObject
 
+private const val JSON_VERSION = 2
+
 object HardwareCalibrationJson {
 
     fun encode(config: HardwareCalibrationConfig): String {
         val json = JSONObject()
-        json.put("v", config.version)
+        json.put("v", JSON_VERSION)
         json.put("descriptor", config.deviceDescriptor ?: JSONObject.NULL)
         val pad = JSONObject()
         config.padKeyCodes.forEach { (code, cell) ->
@@ -21,9 +24,12 @@ object HardwareCalibrationJson {
         config.knobs.sortedBy { it.index }.forEach { k ->
             val o = JSONObject()
             o.put("i", k.index)
-            val rk = JSONArray()
-            k.rotateKeyCodes.sorted().forEach { rk.put(it) }
-            o.put("rotate", rk)
+            val ccw = JSONArray()
+            k.rotateCcwKeyCodes.sorted().forEach { ccw.put(it) }
+            o.put("rotate_ccw", ccw)
+            val cw = JSONArray()
+            k.rotateCwKeyCodes.sorted().forEach { cw.put(it) }
+            o.put("rotate_cw", cw)
             if (k.pressKeyCode != null) o.put("press", k.pressKeyCode) else o.put("press", JSONObject.NULL)
             val mf = JSONArray()
             k.motionFingerprints.sorted().forEach { mf.put(it) }
@@ -53,21 +59,29 @@ object HardwareCalibrationJson {
             for (i in 0 until knobsArr.length()) {
                 val o = knobsArr.getJSONObject(i)
                 val idx = o.optInt("i", i)
-                val rotate = mutableSetOf<Int>()
-                val rj = o.optJSONArray("rotate")
-                if (rj != null) {
-                    for (j in 0 until rj.length()) rotate.add(rj.getInt(j))
-                }
                 val press = if (o.has("press") && !o.isNull("press")) o.optInt("press") else null
                 val mf = mutableSetOf<String>()
                 val mj = o.optJSONArray("motion")
                 if (mj != null) {
                     for (j in 0 until mj.length()) mf.add(mj.getString(j))
                 }
+
+                val ccw = mutableSetOf<Int>()
+                val cw = mutableSetOf<Int>()
+                val ccwArr = o.optJSONArray("rotate_ccw")
+                val cwArr = o.optJSONArray("rotate_cw")
+                if (ccwArr != null || cwArr != null) {
+                    if (ccwArr != null) for (j in 0 until ccwArr.length()) ccw.add(ccwArr.getInt(j))
+                    if (cwArr != null) for (j in 0 until cwArr.length()) cw.add(cwArr.getInt(j))
+                } else {
+                    migrateV1RotateKeys(o.optJSONArray("rotate"), ccw, cw)
+                }
+
                 knobs.add(
                     KnobCalibration(
                         index = idx,
-                        rotateKeyCodes = rotate,
+                        rotateCcwKeyCodes = ccw,
+                        rotateCwKeyCodes = cw,
                         pressKeyCode = press?.takeIf { it > 0 },
                         motionFingerprints = mf,
                     ),
@@ -77,13 +91,29 @@ object HardwareCalibrationJson {
                 knobs.add(KnobCalibration(index = knobs.size))
             }
             HardwareCalibrationConfig(
-                version = version,
+                version = version.coerceIn(1, JSON_VERSION),
                 deviceDescriptor = descriptor,
                 padKeyCodes = padMap,
                 knobs = knobs.sortedBy { it.index }.take(3),
             )
         } catch (_: Exception) {
             null
+        }
+    }
+
+    /** v1 JSON had a single `rotate` array — split volume keys; unknown keys go to both sides (ambiguous). */
+    private fun migrateV1RotateKeys(rotate: JSONArray?, ccw: MutableSet<Int>, cw: MutableSet<Int>) {
+        if (rotate == null) return
+        for (j in 0 until rotate.length()) {
+            val key = rotate.getInt(j)
+            when (key) {
+                KeyEvent.KEYCODE_VOLUME_DOWN -> ccw.add(key)
+                KeyEvent.KEYCODE_VOLUME_UP -> cw.add(key)
+                else -> {
+                    ccw.add(key)
+                    cw.add(key)
+                }
+            }
         }
     }
 }

@@ -5,6 +5,7 @@ import com.example.deckbridge.actions.LoggingActionDispatcher
 import com.example.deckbridge.data.preferences.deckBridgePreferences
 import com.example.deckbridge.data.repository.DeckBridgeRepository
 import com.example.deckbridge.data.repository.DeckBridgeRepositoryImpl
+import com.example.deckbridge.logging.DeckBridgeLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -19,6 +20,7 @@ class DeckBridgeApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        DeckBridgeLog.state("Application onCreate · DeckBridge")
         repository = DeckBridgeRepositoryImpl(
             appContext = this,
             externalScope = applicationScope,
