@@ -8,4 +8,11 @@ data class MirrorPadSlot(
     val title: String,
     val shortcutHint: String,
     val iconToken: String?,
+    /** Deck tile id for touch + highlight; empty when slot is filler only. */
+    val deckButtonId: String = "",
+    /**
+     * Long-press editor target when the tile is visible but [deckButtonId] is empty (e.g. disabled tile).
+     * Defaults to [deckButtonId] when null.
+     */
+    val editTargetButtonId: String? = null,
 )

@@ -20,3 +20,6 @@ keystore/
 
 # IDE (local)
 /.idea/
+
+# Local screenshots / QA captures (do not commit)
+.agent-screenshots/
