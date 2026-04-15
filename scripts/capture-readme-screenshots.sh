@@ -66,3 +66,4 @@ echo "-> $OUT/04-settings.png"
 adb exec-out screencap -p > "$OUT/04-settings.png"
 
 echo "Done. Review images in $OUT"
+echo "Note: README uses https://raw.githubusercontent.com/JUANES545/DeckBridge/master/docs/readme/screenshots/ — push to master so GitHub shows new captures inline."
