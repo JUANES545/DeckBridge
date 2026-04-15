@@ -14,4 +14,8 @@ data class MacroButton(
     val iconToken: String? = null,
     /** Shortcut line for current platform, e.g. Ctrl+C / ⌘C. */
     val resolvedShortcut: String,
+    /** Windows / unknown host subtitle line persisted with the tile (Mac chord comes from the resolver). */
+    val windowsSubtitle: String = "",
+    val enabled: Boolean = true,
+    val visible: Boolean = true,
 )

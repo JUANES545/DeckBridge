@@ -17,7 +17,8 @@ import com.example.deckbridge.domain.hardware.KnobCalibration
 import com.example.deckbridge.domain.hardware.PadCell
 import com.example.deckbridge.domain.hardware.RawChannel
 import com.example.deckbridge.domain.hardware.RawDiagnosticLine
-import com.example.deckbridge.domain.knob.KnobIntentMapper
+import com.example.deckbridge.data.deck.DeckKnobIntentMapper
+import com.example.deckbridge.domain.deck.DeckKnobsLayoutPersisted
 import com.example.deckbridge.domain.model.DeckButtonIntent
 import com.example.deckbridge.input.InputDeviceSnapshotFactory
 import com.example.deckbridge.input.KeyboardKeyFormatter
@@ -71,6 +72,13 @@ class HardwareBridge(
 
     private var loadedConfig: HardwareCalibrationConfig? = null
 
+    @Volatile
+    private var deckKnobsLayout: DeckKnobsLayoutPersisted? = null
+
+    fun setDeckKnobsLayout(layout: DeckKnobsLayoutPersisted) {
+        deckKnobsLayout = layout
+    }
+
     private val _calibrationSession = MutableStateFlow<CalibrationSessionUi?>(null)
     val calibrationSession: StateFlow<CalibrationSessionUi?> = _calibrationSession.asStateFlow()
 
@@ -96,6 +104,8 @@ class HardwareBridge(
 
     private data class CalibrationDraft(
         var deviceDescriptor: String?,
+        var deviceVendorId: Int? = null,
+        var deviceProductId: Int? = null,
         val pad: MutableMap<Int, PadCell> = mutableMapOf(),
         val knobs: Array<KnobDraft> = Array(3) { KnobDraft() },
     )
@@ -155,6 +165,12 @@ class HardwareBridge(
 
         val session = _calibrationSession.value
         if (session != null && event.action == KeyEvent.ACTION_DOWN) {
+            draft?.let { d ->
+                if (d.deviceVendorId == null && snap.vendorId != null && snap.productId != null) {
+                    d.deviceVendorId = snap.vendorId.takeIf { it != 0 }
+                    d.deviceProductId = snap.productId.takeIf { it != 0 }
+                }
+            }
             processCalibrationKeyDown(event.keyCode, desc)
             return HardwareKeyHandleResult(
                 rawLine = rawLine,
@@ -168,7 +184,7 @@ class HardwareBridge(
         val cfg = loadedConfig
         if (cfg != null && cfg.isComplete) {
             if (event.action == KeyEvent.ACTION_UP) {
-                val upMatch = matchKnobPressUp(cfg, event.keyCode, desc)
+                val upMatch = matchKnobPressUp(cfg, event.keyCode, desc, snap.vendorId, snap.productId)
                 if (upMatch != null) {
                     val until = System.currentTimeMillis() + KNOB_PRESS_UP_MS
                     val h = HardwareMirrorHighlight(
@@ -194,7 +210,7 @@ class HardwareBridge(
                 }
             }
             if (event.action == KeyEvent.ACTION_DOWN) {
-                val match = matchPadKey(cfg, event.keyCode, desc)
+                val match = matchPadKey(cfg, event.keyCode, desc, snap.vendorId, snap.productId)
                 if (match != null) {
                     val until = System.currentTimeMillis() + HIGHLIGHT_MS
                     val h = HardwareMirrorHighlight(
@@ -216,7 +232,7 @@ class HardwareBridge(
                         completedCalibration = null,
                     )
                 }
-                val knobMatch = findKnobKeyMatch(cfg, event.keyCode, desc)
+                val knobMatch = findKnobKeyMatch(cfg, event.keyCode, desc, snap.vendorId, snap.productId)
                 if (knobMatch != null) {
                     val until = System.currentTimeMillis() + HIGHLIGHT_MS
                     val kind = if (knobMatch.isPress) {
@@ -292,6 +308,10 @@ class HardwareBridge(
                 val print = motionFingerprint(event)
                 d.knobs[idx].motionPrints.add(print)
                 if (d.deviceDescriptor == null) d.deviceDescriptor = snap.descriptor
+                if (d.deviceVendorId == null && snap.vendorId != null && snap.productId != null) {
+                    d.deviceVendorId = snap.vendorId.takeIf { it != 0 }
+                    d.deviceProductId = snap.productId.takeIf { it != 0 }
+                }
                 advanceAfterCapture("Motion: $print")
                 return HardwareMotionHandleResult(rawLine, null, null, null)
             }
@@ -300,7 +320,7 @@ class HardwareBridge(
         val cfg = loadedConfig
         if (cfg != null && cfg.isComplete && isSignificantMotion(event)) {
             val print = motionFingerprint(event)
-            val knob = matchKnobMotion(cfg, print, snap.descriptor)
+            val knob = matchKnobMotion(cfg, print, snap.descriptor, snap.vendorId, snap.productId)
             if (knob != null) {
                 val scroll = event.getAxisValue(MotionEvent.AXIS_SCROLL)
                 val cw = scroll >= 0
@@ -311,7 +331,9 @@ class HardwareBridge(
                     untilEpochMs = until,
                     rotationVisual = if (cw) 1f else -1f,
                 )
-                val deckIntent = KnobIntentMapper.intentForRotate(knob.index, ccw = !cw)
+                val deckIntent = deckKnobsLayout?.let { layout ->
+                    DeckKnobIntentMapper.intentForRotate(layout, knob.index, ccw = !cw)
+                }
                 return HardwareMotionHandleResult(
                     rawLine = rawLine,
                     mirrorHighlight = h,
@@ -331,10 +353,13 @@ class HardwareBridge(
         return HardwareMotionHandleResult(rawLine, null, null, null)
     }
 
-    private fun deckIntentForKnobKey(m: KnobKeyMatch): DeckButtonIntent? = when {
-        m.isPress -> KnobIntentMapper.intentForPress(m.knob.index)
-        m.rotateCcw != null -> KnobIntentMapper.intentForRotate(m.knob.index, m.rotateCcw)
-        else -> null
+    private fun deckIntentForKnobKey(m: KnobKeyMatch): DeckButtonIntent? {
+        val layout = deckKnobsLayout ?: return null
+        return when {
+            m.isPress -> DeckKnobIntentMapper.intentForPress(layout, m.knob.index)
+            m.rotateCcw != null -> DeckKnobIntentMapper.intentForRotate(layout, m.knob.index, m.rotateCcw)
+            else -> null
+        }
     }
 
     private fun processCalibrationKeyDown(
@@ -421,7 +446,10 @@ class HardwareBridge(
                 draft = null
                 stepIndex = 0
                 _calibrationSession.value = null
-                DeckBridgeLog.cal("wizard complete isComplete=${cfg.isComplete} device=${cfg.deviceDescriptor?.take(48)}")
+                DeckBridgeLog.cal(
+                    "wizard complete isComplete=${cfg.isComplete} desc=${cfg.deviceDescriptor?.take(48)} " +
+                        "vid=${cfg.deviceVendorId} pid=${cfg.deviceProductId}",
+                )
                 scope.launch { onCalibrationComplete(cfg) }
             }
             return
@@ -473,20 +501,34 @@ class HardwareBridge(
         return HardwareCalibrationConfig(
             version = CALIB_VERSION,
             deviceDescriptor = d.deviceDescriptor,
+            deviceVendorId = d.deviceVendorId,
+            deviceProductId = d.deviceProductId,
             padKeyCodes = d.pad.toMap(),
             knobs = knobs,
         )
     }
 
-    private fun matchPadKey(cfg: HardwareCalibrationConfig, keyCode: Int, descriptor: String?): HardwareControlId.PadKey? {
-        if (!cfg.matchesDevice(descriptor)) return null
+    private fun matchPadKey(
+        cfg: HardwareCalibrationConfig,
+        keyCode: Int,
+        descriptor: String?,
+        vendorId: Int?,
+        productId: Int?,
+    ): HardwareControlId.PadKey? {
+        if (!cfg.matchesDevice(descriptor, vendorId, productId)) return null
         val cell = cfg.padKeyCodes[keyCode] ?: return null
         return HardwareControlId.PadKey(cell.row, cell.col)
     }
 
     /** Press wins; then CCW-only, CW-only, or ambiguous membership (volume heuristics). */
-    private fun findKnobKeyMatch(cfg: HardwareCalibrationConfig, keyCode: Int, descriptor: String?): KnobKeyMatch? {
-        if (!cfg.matchesDevice(descriptor)) return null
+    private fun findKnobKeyMatch(
+        cfg: HardwareCalibrationConfig,
+        keyCode: Int,
+        descriptor: String?,
+        vendorId: Int?,
+        productId: Int?,
+    ): KnobKeyMatch? {
+        if (!cfg.matchesDevice(descriptor, vendorId, productId)) return null
         cfg.knobs.forEach { k ->
             if (k.pressKeyCode == keyCode) {
                 return KnobKeyMatch(HardwareControlId.Knob(k.index), isPress = true, rotateCcw = null)
@@ -510,8 +552,14 @@ class HardwareBridge(
         return null
     }
 
-    private fun matchKnobPressUp(cfg: HardwareCalibrationConfig, keyCode: Int, descriptor: String?): HardwareControlId.Knob? {
-        if (!cfg.matchesDevice(descriptor)) return null
+    private fun matchKnobPressUp(
+        cfg: HardwareCalibrationConfig,
+        keyCode: Int,
+        descriptor: String?,
+        vendorId: Int?,
+        productId: Int?,
+    ): HardwareControlId.Knob? {
+        if (!cfg.matchesDevice(descriptor, vendorId, productId)) return null
         cfg.knobs.forEach { k ->
             if (k.pressKeyCode == keyCode) {
                 return HardwareControlId.Knob(k.index)
@@ -520,8 +568,14 @@ class HardwareBridge(
         return null
     }
 
-    private fun matchKnobMotion(cfg: HardwareCalibrationConfig, print: String, descriptor: String?): HardwareControlId.Knob? {
-        if (!cfg.matchesDevice(descriptor)) return null
+    private fun matchKnobMotion(
+        cfg: HardwareCalibrationConfig,
+        print: String,
+        descriptor: String?,
+        vendorId: Int?,
+        productId: Int?,
+    ): HardwareControlId.Knob? {
+        if (!cfg.matchesDevice(descriptor, vendorId, productId)) return null
         cfg.knobs.forEach { k ->
             if (k.motionFingerprints.any { print.contains(it) || it.contains(print) }) {
                 return HardwareControlId.Knob(k.index)
