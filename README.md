@@ -57,7 +57,7 @@ flowchart TB
 ## Experience walkthrough
 
 Suggested reading order: **first run → home → settings**.  
-*Figures below are **tone placeholders** (same aspect ratio as a phone). Replace with real device screenshots anytime: `bash scripts/capture-readme-screenshots.sh` (requires `adb` + a running emulator or USB device with the app installed).*
+*Screenshots below are **720×1600 captures** from a physical device, generated with `bash scripts/capture-readme-screenshots.sh` (requires `adb` + the app installed). Re-run the script after UI changes to refresh them.*
 
 ### 1 · Onboarding
 
