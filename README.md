@@ -56,8 +56,8 @@ flowchart TB
 
 ## Experience walkthrough
 
-Suggested reading order: **first run → home → settings**.  
-*Screenshots below are **720×1600 captures** from a physical device, generated with `bash scripts/capture-readme-screenshots.sh` (requires `adb` + the app installed). Re-run the script after UI changes to refresh them.*
+Suggested reading order: **first run → home → dashboard (portrait & landscape) → settings**.  
+*Screenshots are from a physical device (**720×1600** portrait, **1600×720** landscape), generated with `bash scripts/capture-readme-screenshots.sh` (requires `adb` + the app installed). Re-run the script after UI changes to refresh them.*
 
 ### 1 · Onboarding
 
@@ -75,20 +75,28 @@ Connection gate or hand-off before you land on the main deck—this is where **P
   <img src="https://raw.githubusercontent.com/JUANES545/DeckBridge/master/docs/readme/screenshots/02-after-onboarding.png" width="280" alt="DeckBridge post-onboarding or connection gate" />
 </p>
 
-### 3 · Dashboard
+### 3 · Dashboard (portrait)
 
 **Hardware mirror**, deck grid, and host platform context—where you spend most of your time.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/JUANES545/DeckBridge/master/docs/readme/screenshots/03-dashboard.png" width="280" alt="DeckBridge dashboard with mirror" />
+  <img src="https://raw.githubusercontent.com/JUANES545/DeckBridge/master/docs/readme/screenshots/03-dashboard.png" width="280" alt="DeckBridge dashboard with mirror in portrait" />
 </p>
 
-### 4 · Settings
+### 4 · Main screen (landscape)
+
+Same **home / dashboard** with the **horizontal layout**: mirror and deck controls use the wider strip (ideal on a stand or when the phone is rotated).
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/JUANES545/DeckBridge/master/docs/readme/screenshots/04-dashboard-landscape.png" width="640" alt="DeckBridge main screen and deck buttons in landscape" />
+</p>
+
+### 5 · Settings
 
 **Agents & delivery**: discovery, LAN endpoint, health checks, **add another computer**, calibration entry, and advanced toggles.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/JUANES545/DeckBridge/master/docs/readme/screenshots/04-settings.png" width="280" alt="DeckBridge settings" />
+  <img src="https://raw.githubusercontent.com/JUANES545/DeckBridge/master/docs/readme/screenshots/05-settings.png" width="280" alt="DeckBridge settings" />
 </p>
 
 ```mermaid
