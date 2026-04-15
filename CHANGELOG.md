@@ -6,11 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 **Language:** Changelog entries and pull request descriptions are written in **English**.
 
-## [1.2.1] - 2026-04-10
+## [1.3.0] - 2026-04-11
+
+### Added
+
+- **Host platform & USB:** `HostOsDetector` for best-effort host OS awareness when tethered as a USB device; USB state probing integrated into repository refresh.
+- **HID transport:** `HidGadgetSession` probe pipeline, `HidTransportUiMapper` / `HidDebugLineFormatter`, `HidTransportDispatcher` with keyboard/consumer writability, HID PC mode toggle, and privileged-shell availability checks surfaced in app state and settings.
+- **Delivery routing:** `HostDeliveryRouter` and `HostDeliveryChannel` (USB HID vs LAN) with DataStore-backed preferences and LAN client wiring in `DeckBridgeRepositoryImpl`.
+- **Pairing:** Pairing session models and QR-style payload coverage (`DeckbridgePairingPayloadTest`).
+- **Onboarding:** First-run `OnboardingFlow` with themed components.
+- **Deck editing:** `GridButtonEditScreen` / `GridButtonEditViewModel`; `KnobEditScreen` / `KnobEditViewModel` / `KnobEditBinding`.
+- **Dashboard & mirror:** `DashboardBackground`, `DashboardChrome`, `DashboardEnergyPulses`, `DeviceChargingState`; expanded `HardwareMirrorPanel` with `MirrorLayoutDensity` and `MirrorPanelChrome`; `ic_platform_windows` drawable.
+- **Strings:** Large EN + `values-es` updates for HID diagnostics, host detection, settings, and onboarding.
+
+### Changed
+
+- **Navigation:** `DeckBridgeNavHost` extended for onboarding, deck editors, and related destinations.
+- **Home & settings:** `HomeScreen` and `SettingsScreen` refactored for host/HID/LAN controls and new chrome.
+- **Repository:** `DeckBridgeRepository` / implementation expanded for host refresh, LAN health, pairing sync, and HID logging.
 
 ### Removed
 
-- **Repository scope:** Removed `pc-lan-server/` (Windows LAN agent sources), `docs/QR_FLOW_QA.md`, and `.scripts/` from the tree so this project contains **only the Android app**. Host agents live in separate repositories.
+- **Repository scope:** Dropped `pc-lan-server/`, `docs/QR_FLOW_QA.md`, and `.scripts/` so the repo is **Android-only**; host-side agents live in separate repositories.
 
 ## [1.2.0] - 2026-04-10
 
@@ -69,6 +86,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Initial public release: Jetpack Compose shell, release signing via `keystore.properties`, and project tooling.
 
+[1.3.0]: https://github.com/JUANES545/DeckBridge/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/JUANES545/DeckBridge/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/JUANES545/DeckBridge/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/JUANES545/DeckBridge/compare/v1.0.0...v1.1.0
