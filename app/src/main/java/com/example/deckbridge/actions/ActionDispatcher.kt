@@ -7,9 +7,10 @@ import com.example.deckbridge.domain.model.ResolvedAction
  * platform-specific, display-ready payloads produced by [com.example.deckbridge.domain.PlatformActionResolver].
  */
 fun interface ActionDispatcher {
-    suspend fun dispatch(resolved: ResolvedAction)
+    /** [Result.failure] when the transport could not complete (e.g. HTTP error on LAN). */
+    suspend fun dispatch(resolved: ResolvedAction): Result<Unit>
 }
 
 class NoOpActionDispatcher : ActionDispatcher {
-    override suspend fun dispatch(resolved: ResolvedAction) = Unit
+    override suspend fun dispatch(resolved: ResolvedAction): Result<Unit> = Result.success(Unit)
 }

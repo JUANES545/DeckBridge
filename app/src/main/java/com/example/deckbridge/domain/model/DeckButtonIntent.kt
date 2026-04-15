@@ -30,6 +30,31 @@ sealed class DeckButtonIntent {
         data object Redo : KeyboardChord() {
             override val intentId: String = "deck.intent.redo"
         }
+
+        /** Windows ⊞+D / macOS Mission Control–style shortcut (best-effort on Mac). */
+        data object ShowDesktop : KeyboardChord() {
+            override val intentId: String = "deck.intent.show_desktop"
+        }
+
+        /** Windows Snipping Tool overlay (⊞+Shift+S). */
+        data object SnippingOverlay : KeyboardChord() {
+            override val intentId: String = "deck.intent.snipping_overlay"
+        }
+    }
+
+    /** Types literal text on the host (LAN primary). */
+    data class InjectText(val literal: String) : DeckButtonIntent() {
+        override val intentId: String = "deck.intent.inject_text"
+    }
+
+    sealed class SingleKey : DeckButtonIntent() {
+        data object Enter : SingleKey() {
+            override val intentId: String = "deck.intent.key.enter"
+        }
+
+        data object Escape : SingleKey() {
+            override val intentId: String = "deck.intent.key.escape"
+        }
     }
 
     sealed class SystemMedia : DeckButtonIntent() {
@@ -56,5 +81,10 @@ sealed class DeckButtonIntent {
         data object Mute : SystemMedia() {
             override val intentId: String = "deck.intent.media.mute"
         }
+    }
+
+    /** Placeholder / reserved actions; host delivery treats as no-op. */
+    data object Noop : DeckButtonIntent() {
+        override val intentId: String = "deck.intent.noop"
     }
 }

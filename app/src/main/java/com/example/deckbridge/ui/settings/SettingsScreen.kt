@@ -1,5 +1,6 @@
 package com.example.deckbridge.ui.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,26 +9,41 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.draw.alpha
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
+import androidx.compose.material.icons.outlined.Computer
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.deckbridge.R
@@ -35,9 +51,11 @@ import com.example.deckbridge.domain.hardware.HardwareCalibrationConfig
 import com.example.deckbridge.domain.hardware.HardwareDiagSummary
 import com.example.deckbridge.domain.hardware.RawChannel
 import com.example.deckbridge.domain.hardware.RawDiagnosticLine
+import com.example.deckbridge.domain.model.AnimatedBackgroundMode
 import com.example.deckbridge.domain.model.AppState
 import com.example.deckbridge.domain.model.ButtonTriggerSource
 import com.example.deckbridge.domain.model.DeckActivationLogEntry
+import com.example.deckbridge.domain.model.HostDeliveryChannel
 import com.example.deckbridge.domain.model.HostPlatform
 import com.example.deckbridge.domain.model.HostPlatformSource
 import com.example.deckbridge.domain.model.HostUsbConnectionState
@@ -51,8 +69,16 @@ import java.util.Locale
 fun SettingsScreen(
     state: AppState,
     onNavigateBack: () -> Unit,
+    onOpenAddAnotherHost: () -> Unit,
     onRefreshKeyboards: () -> Unit,
     onHostAutoDetectChanged: (Boolean) -> Unit,
+    onHidPcModeChanged: (Boolean) -> Unit,
+    onHostDeliveryChannelChanged: (HostDeliveryChannel) -> Unit,
+    onApplyLanEndpoint: (String, Int) -> Unit,
+    onTestLanHealth: () -> Unit,
+    onForgetLanLink: () -> Unit,
+    onOpenHardwareCalibration: () -> Unit = {},
+    onAnimatedBackgroundModeChanged: (AnimatedBackgroundMode) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     LaunchedEffect(Unit) {
@@ -83,8 +109,15 @@ fun SettingsScreen(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
+            AddAnotherHostSettingsCard(onClick = onOpenAddAnotherHost)
             SectionLabel(stringResource(R.string.settings_logcat_hint_title))
             LogcatHintCard()
+
+            SectionLabel(stringResource(R.string.settings_section_animated_background))
+            AnimatedBackgroundPreferenceCard(
+                selected = state.animatedBackgroundMode,
+                onSelect = onAnimatedBackgroundModeChanged,
+            )
 
             SectionLabel(stringResource(R.string.settings_section_session))
             LiveHardwareSessionCard(
@@ -95,10 +128,37 @@ fun SettingsScreen(
             SectionLabel(stringResource(R.string.settings_calibration_map))
             CalibrationMapCard(calibration = state.hardwareCalibration)
 
+            SectionLabel(stringResource(R.string.settings_calibration_wizard_section))
+            Text(
+                text = stringResource(R.string.settings_calibration_wizard_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(
+                onClick = onOpenHardwareCalibration,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(),
+            ) {
+                Text(stringResource(R.string.settings_calibration_wizard_button))
+            }
+
             SectionLabel(stringResource(R.string.settings_section_keyboard_host))
             KeyboardHostCompactCard(state = state)
 
+            SectionLabel(stringResource(R.string.settings_section_lan_pc))
+            LanPcAgentCard(
+                state = state,
+                onChannel = onHostDeliveryChannelChanged,
+                onApplyLan = onApplyLanEndpoint,
+                onTestLan = onTestLanHealth,
+                onForgetLanLink = onForgetLanLink,
+            )
+
             SectionLabel(stringResource(R.string.settings_section_hid_host))
+            HidPcModeAndDebugCard(
+                state = state,
+                onHidPcModeChanged = onHidPcModeChanged,
+            )
             HostHidTransportCard(
                 state = state,
                 onHostAutoDetectChanged = onHostAutoDetectChanged,
@@ -116,12 +176,115 @@ fun SettingsScreen(
 }
 
 @Composable
+private fun AddAnotherHostSettingsCard(onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Computer,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            Column(
+                Modifier
+                    .weight(1f)
+                    .padding(start = 14.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.settings_add_another_host_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = stringResource(R.string.settings_add_another_host_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.alpha(0.88f),
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+        }
+    }
+}
+
+@Composable
 private fun LogcatHintCard() {
     ElevatedInfoCard {
         Text(
             text = stringResource(R.string.settings_logcat_hint_body),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun AnimatedBackgroundPreferenceCard(
+    selected: AnimatedBackgroundMode,
+    onSelect: (AnimatedBackgroundMode) -> Unit,
+) {
+    ElevatedInfoCard {
+        Text(
+            text = stringResource(R.string.settings_animated_bg_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(10.dp))
+        AnimatedBackgroundRadioRow(
+            label = stringResource(R.string.settings_animated_bg_always),
+            chosen = selected == AnimatedBackgroundMode.ALWAYS,
+            onClick = { onSelect(AnimatedBackgroundMode.ALWAYS) },
+        )
+        AnimatedBackgroundRadioRow(
+            label = stringResource(R.string.settings_animated_bg_charging),
+            chosen = selected == AnimatedBackgroundMode.WHEN_CHARGING,
+            onClick = { onSelect(AnimatedBackgroundMode.WHEN_CHARGING) },
+        )
+        AnimatedBackgroundRadioRow(
+            label = stringResource(R.string.settings_animated_bg_off),
+            chosen = selected == AnimatedBackgroundMode.OFF,
+            onClick = { onSelect(AnimatedBackgroundMode.OFF) },
+        )
+    }
+}
+
+@Composable
+private fun AnimatedBackgroundRadioRow(
+    label: String,
+    chosen: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(
+            selected = chosen,
+            onClick = onClick,
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(start = 4.dp),
         )
     }
 }
@@ -194,6 +357,14 @@ private fun CalibrationMapCard(calibration: HardwareCalibrationConfig?) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (calibration.deviceVendorId == null || calibration.deviceProductId == null) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = stringResource(R.string.settings_calibration_bt_identity_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
         Spacer(Modifier.height(8.dp))
         Text(
             text = stringResource(R.string.settings_calibration_pads, calibration.padKeyCodes.size),
@@ -228,6 +399,212 @@ private fun knobTitle(index: Int): String = when (index) {
     1 -> stringResource(R.string.knob_middle)
     2 -> stringResource(R.string.knob_bottom)
     else -> stringResource(R.string.knob_generic, index + 1)
+}
+
+@Composable
+private fun LanPcAgentCard(
+    state: AppState,
+    onChannel: (HostDeliveryChannel) -> Unit,
+    onApplyLan: (String, Int) -> Unit,
+    onTestLan: () -> Unit,
+    onForgetLanLink: () -> Unit,
+) {
+    var hostDraft by remember { mutableStateOf(state.lanServerHost) }
+    var portDraft by remember { mutableStateOf(state.lanServerPort.toString()) }
+    LaunchedEffect(state.lanServerHost, state.lanServerPort) {
+        hostDraft = state.lanServerHost
+        portDraft = state.lanServerPort.toString()
+    }
+
+    ElevatedInfoCard {
+        Text(
+            text = stringResource(R.string.settings_lan_channel_title),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = stringResource(R.string.settings_lan_auto_discover_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(10.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onChannel(HostDeliveryChannel.LAN) },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RadioButton(
+                selected = state.hostDeliveryChannel == HostDeliveryChannel.LAN,
+                onClick = { onChannel(HostDeliveryChannel.LAN) },
+            )
+            Text(
+                text = stringResource(R.string.settings_lan_channel_lan),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(start = 4.dp),
+            )
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onChannel(HostDeliveryChannel.USB_HID) },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RadioButton(
+                selected = state.hostDeliveryChannel == HostDeliveryChannel.USB_HID,
+                onClick = { onChannel(HostDeliveryChannel.USB_HID) },
+            )
+            Text(
+                text = stringResource(R.string.settings_lan_channel_usb_hid),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(start = 4.dp),
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        OutlinedTextField(
+            value = hostDraft,
+            onValueChange = { hostDraft = it },
+            label = { Text(stringResource(R.string.settings_lan_host_label)) },
+            placeholder = { Text(stringResource(R.string.settings_lan_host_placeholder)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(8.dp))
+        OutlinedTextField(
+            value = portDraft,
+            onValueChange = { v -> portDraft = v.filter { it.isDigit() }.take(5) },
+            label = { Text(stringResource(R.string.settings_lan_port_label)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Button(
+                onClick = {
+                    val p = portDraft.toIntOrNull()?.coerceIn(1, 65_535) ?: state.lanServerPort
+                    onApplyLan(hostDraft.trim(), p)
+                },
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(stringResource(R.string.settings_lan_apply))
+            }
+            Button(onClick = onTestLan) {
+                Text(stringResource(R.string.settings_lan_test_health))
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = when (state.lanHealthOk) {
+                null -> stringResource(R.string.settings_lan_health_unknown)
+                true -> stringResource(R.string.settings_lan_health_ok)
+                false -> stringResource(R.string.settings_lan_health_fail)
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = if (state.lanTrustOk) {
+                stringResource(R.string.settings_lan_trust_ok)
+            } else {
+                stringResource(R.string.settings_lan_trust_lost)
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = if (state.lanTrustOk) {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            } else {
+                MaterialTheme.colorScheme.error
+            },
+        )
+        if (state.lanPersistedPairActive) {
+            Spacer(Modifier.height(10.dp))
+            OutlinedButton(
+                onClick = onForgetLanLink,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.settings_lan_forget_link))
+            }
+        }
+        if (state.lanHealthOk == false && !state.lanHealthDetail.isNullOrBlank()) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = state.lanHealthDetail,
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = stringResource(R.string.settings_lan_security_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+        )
+    }
+}
+
+@Composable
+private fun HidPcModeAndDebugCard(
+    state: AppState,
+    onHidPcModeChanged: (Boolean) -> Unit,
+) {
+    ElevatedInfoCard {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(modifier = Modifier.weight(1f).widthIn(max = 240.dp)) {
+                Text(
+                    text = stringResource(R.string.settings_hid_pc_mode_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = stringResource(R.string.settings_hid_pc_mode_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = state.hidPcModeEnabled,
+                onCheckedChange = onHidPcModeChanged,
+            )
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(
+            text = stringResource(R.string.settings_hid_pc_mode_usb_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        StatusRow(
+            label = stringResource(R.string.settings_hid_root_label),
+            value = stringResource(
+                if (state.privilegedShellAvailable) R.string.settings_bind_yes else R.string.settings_bind_no,
+            ),
+            positive = state.privilegedShellAvailable,
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(
+            text = stringResource(R.string.settings_hid_debug_strip_label),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = state.hidDebugLine.ifBlank { stringResource(R.string.settings_hid_debug_empty) },
+            style = MaterialTheme.typography.bodySmall,
+            fontFamily = FontFamily.Monospace,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+    }
 }
 
 @Composable
@@ -501,6 +878,7 @@ private fun activationSourceLabel(source: ButtonTriggerSource): String = when (s
     ButtonTriggerSource.TOUCH -> stringResource(R.string.trigger_touch)
     ButtonTriggerSource.HARDWARE_KEY -> stringResource(R.string.trigger_hardware_key)
     ButtonTriggerSource.HARDWARE_KNOB -> stringResource(R.string.trigger_hardware_knob)
+    ButtonTriggerSource.TOUCH_MIRROR_KNOB -> stringResource(R.string.trigger_touch_mirror_knob)
     ButtonTriggerSource.SIMULATED -> stringResource(R.string.trigger_simulated_activation)
 }
 

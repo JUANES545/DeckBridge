@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 **Language:** Changelog entries and pull request descriptions are written in **English**.
 
+## [1.2.1] - 2026-04-10
+
+### Removed
+
+- **Repository scope:** Removed `pc-lan-server/` (Windows LAN agent sources), `docs/QR_FLOW_QA.md`, and `.scripts/` from the tree so this project contains **only the Android app**. Host agents live in separate repositories.
+
 ## [1.2.0] - 2026-04-10
 
 ### Added

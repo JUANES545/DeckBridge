@@ -58,6 +58,47 @@ object PlatformActionResolver {
                 windows = "Ctrl+Y",
                 mac = "⌘⇧Z",
             )
+            is DeckButtonIntent.KeyboardChord.ShowDesktop -> chord(
+                intent = intent,
+                displayName = "Show desktop",
+                p = p,
+                windows = "Win+D",
+                mac = "⌃↑",
+            )
+            is DeckButtonIntent.KeyboardChord.SnippingOverlay -> chord(
+                intent = intent,
+                displayName = "Screenshot",
+                p = p,
+                windows = "Win+Shift+S",
+                mac = "⌘⇧4",
+            )
+            is DeckButtonIntent.InjectText -> ResolvedAction(
+                intentId = intent.intentId,
+                intentDisplayName = "Text",
+                platform = p,
+                shortcutDisplay = "LAN · \"${intent.literal}\"",
+                kind = ResolvedActionKind.TEXT,
+                textPayload = intent.literal,
+                keyToken = null,
+            )
+            is DeckButtonIntent.SingleKey.Enter -> ResolvedAction(
+                intentId = intent.intentId,
+                intentDisplayName = "Enter",
+                platform = p,
+                shortcutDisplay = "Enter",
+                kind = ResolvedActionKind.KEY,
+                textPayload = null,
+                keyToken = "enter",
+            )
+            is DeckButtonIntent.SingleKey.Escape -> ResolvedAction(
+                intentId = intent.intentId,
+                intentDisplayName = "Escape",
+                platform = p,
+                shortcutDisplay = "Esc",
+                kind = ResolvedActionKind.KEY,
+                textPayload = null,
+                keyToken = "escape",
+            )
             is DeckButtonIntent.SystemMedia.VolumeUp -> media(
                 intent = intent,
                 displayName = "Vol+",
@@ -94,6 +135,15 @@ object PlatformActionResolver {
                 p = p,
                 label = "Media · Mute",
             )
+            DeckButtonIntent.Noop -> ResolvedAction(
+                intentId = intent.intentId,
+                intentDisplayName = "No-op",
+                platform = p,
+                shortcutDisplay = "—",
+                kind = ResolvedActionKind.NOOP,
+                textPayload = null,
+                keyToken = null,
+            )
         }
     }
 
@@ -128,6 +178,8 @@ object PlatformActionResolver {
         platform = p,
         shortcutDisplay = label,
         kind = ResolvedActionKind.SYSTEM_MEDIA,
+        textPayload = null,
+        keyToken = null,
     )
 
     private fun HostPlatform.coerceForDeck(): HostPlatform = when (this) {
