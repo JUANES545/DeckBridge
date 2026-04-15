@@ -15,6 +15,16 @@ object HardwareCalibrationJson {
         val json = JSONObject()
         json.put("v", JSON_VERSION)
         json.put("descriptor", config.deviceDescriptor ?: JSONObject.NULL)
+        if (config.deviceVendorId != null && config.deviceVendorId != 0) {
+            json.put("vendor_id", config.deviceVendorId)
+        } else {
+            json.put("vendor_id", JSONObject.NULL)
+        }
+        if (config.deviceProductId != null && config.deviceProductId != 0) {
+            json.put("product_id", config.deviceProductId)
+        } else {
+            json.put("product_id", JSONObject.NULL)
+        }
         val pad = JSONObject()
         config.padKeyCodes.forEach { (code, cell) ->
             pad.put(code.toString(), "${cell.row},${cell.col}")
@@ -46,6 +56,16 @@ object HardwareCalibrationJson {
             val json = JSONObject(raw)
             val version = json.optInt("v", 1)
             val descriptor = json.optString("descriptor", "").takeIf { it.isNotBlank() && it != "null" }
+            val vendorId = if (json.has("vendor_id") && !json.isNull("vendor_id")) {
+                json.optInt("vendor_id", 0).takeIf { it != 0 }
+            } else {
+                null
+            }
+            val productId = if (json.has("product_id") && !json.isNull("product_id")) {
+                json.optInt("product_id", 0).takeIf { it != 0 }
+            } else {
+                null
+            }
             val padObj = json.optJSONObject("pad") ?: JSONObject()
             val padMap = mutableMapOf<Int, PadCell>()
             padObj.keys().forEach { key ->
@@ -93,6 +113,8 @@ object HardwareCalibrationJson {
             HardwareCalibrationConfig(
                 version = version.coerceIn(1, JSON_VERSION),
                 deviceDescriptor = descriptor,
+                deviceVendorId = vendorId,
+                deviceProductId = productId,
                 padKeyCodes = padMap,
                 knobs = knobs.sortedBy { it.index }.take(3),
             )

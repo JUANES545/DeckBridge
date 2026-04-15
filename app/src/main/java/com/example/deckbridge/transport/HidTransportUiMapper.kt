@@ -8,7 +8,11 @@ import com.example.deckbridge.hid.HidGadgetSession
 
 object HidTransportUiMapper {
 
-    fun toUiState(probe: HidGadgetSession.ProbeResult, res: Resources): HidTransportUiState {
+    fun toUiState(
+        probe: HidGadgetSession.ProbeResult,
+        res: Resources,
+        privilegedShellAvailable: Boolean = false,
+    ): HidTransportUiState {
         val summary = when (probe.phase) {
             HidTransportPhase.NOT_PROBED -> res.getString(R.string.hid_transport_summary_not_probed)
             HidTransportPhase.PROBING -> res.getString(R.string.hid_transport_summary_probing)
@@ -19,7 +23,7 @@ object HidTransportUiMapper {
                 res.getString(R.string.hid_transport_summary_full_ready)
             HidTransportPhase.ERROR -> res.getString(R.string.hid_transport_summary_error)
         }
-        val detail = buildDetail(probe, res)
+        val detail = buildDetail(probe, res, privilegedShellAvailable)
         return HidTransportUiState(
             phase = probe.phase,
             summary = summary,
@@ -32,7 +36,11 @@ object HidTransportUiMapper {
         )
     }
 
-    private fun buildDetail(probe: HidGadgetSession.ProbeResult, res: Resources): String {
+    private fun buildDetail(
+        probe: HidGadgetSession.ProbeResult,
+        res: Resources,
+        privilegedShellAvailable: Boolean,
+    ): String {
         val base = res.getString(R.string.hid_transport_detail_default)
         val err = probe.lastError?.let { "\n${res.getString(R.string.hid_transport_last_error, it)}" } ?: ""
         val paths = "\n${res.getString(R.string.hid_transport_paths, probe.keyboardPath, probe.consumerPath)}"
@@ -41,7 +49,17 @@ object HidTransportUiMapper {
             nodeStateLabel(probe.keyboardExists, probe.keyboardWritable, res),
             nodeStateLabel(probe.consumerExists, probe.consumerWritable, res),
         )}"
-        return base + paths + probeLine + err
+        val rootNoGadget = if (
+            probe.phase == HidTransportPhase.NO_NODES &&
+            privilegedShellAvailable &&
+            !probe.keyboardExists &&
+            !probe.consumerExists
+        ) {
+            "\n${res.getString(R.string.hid_transport_detail_root_but_no_hidg)}"
+        } else {
+            ""
+        }
+        return base + paths + probeLine + rootNoGadget + err
     }
 
     private fun nodeStateLabel(exists: Boolean, writable: Boolean, res: Resources): String = when {
