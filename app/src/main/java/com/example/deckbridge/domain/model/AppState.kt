@@ -72,4 +72,8 @@ data class AppState(
     val lanTrustOk: Boolean,
     /** Subtle animated grid background on the home dashboard (persisted). */
     val animatedBackgroundMode: AnimatedBackgroundMode,
+    /** IP of the Mac agent currently long-polling the bridge server; null = no active client. */
+    val macBridgeClientIp: String? = null,
+    /** True when a Mac agent polled /action/next within the last ~90 s. */
+    val macBridgeClientAlive: Boolean = false,
 )

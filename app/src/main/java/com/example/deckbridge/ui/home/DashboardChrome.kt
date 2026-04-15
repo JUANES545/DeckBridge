@@ -171,13 +171,21 @@ private fun ChromeIconButton(
 
 @Composable
 private fun ConnectionStatusDot(state: AppState) {
-    val lan = state.hostDeliveryChannel == HostDeliveryChannel.LAN
+    val channel = state.hostDeliveryChannel
+    val lan = channel == HostDeliveryChannel.LAN
+    val macBridge = channel == HostDeliveryChannel.MAC_BRIDGE
     val hostBlank = state.lanServerHost.isBlank()
     val hostLine = state.lanServerHost.trim().takeIf { it.isNotEmpty() }
         ?: stringResource(R.string.dash_host_placeholder)
     val detailShort = state.lanHealthDetail?.trim()?.take(44)?.takeIf { it.isNotEmpty() }
 
     val (dotColor, statusLabel) = when {
+        macBridge && state.macBridgeClientAlive && state.lanPersistedPairActive ->
+            Color(0xFF2EE6A0) to stringResource(R.string.dash_mac_bridge_linked)
+        macBridge && state.macBridgeClientAlive ->
+            Color(0xFF2EE6A0) to stringResource(R.string.dash_mac_bridge_connected)
+        macBridge ->
+            Color(0xFFFFB020) to stringResource(R.string.dash_mac_bridge_waiting)
         !lan -> Color(0xFF5A5A68) to stringResource(R.string.dash_link_hid)
         !state.lanTrustOk -> Color(0xFFFF6B5A) to stringResource(R.string.dash_lan_trust)
         lan && hostBlank -> Color(0xFFFFB020) to stringResource(R.string.dash_lan_no_host)
@@ -187,6 +195,9 @@ private fun ConnectionStatusDot(state: AppState) {
     }
 
     val detailLine = when {
+        macBridge && state.macBridgeClientAlive ->
+            state.macBridgeClientIp ?: stringResource(R.string.dash_host_placeholder)
+        macBridge -> stringResource(R.string.dash_mac_bridge_waiting)
         lan && state.lanHealthOk == false && detailShort != null -> detailShort
         else -> hostLine
     }

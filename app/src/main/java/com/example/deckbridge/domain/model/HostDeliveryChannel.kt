@@ -7,11 +7,14 @@ package com.example.deckbridge.domain.model
 enum class HostDeliveryChannel {
     LAN,
     USB_HID,
+    /** Android runs the HTTP server; Mac connects outbound (bypasses corporate VPN inbound block). */
+    MAC_BRIDGE,
     ;
 
     companion object {
         fun fromPersisted(raw: String?): HostDeliveryChannel = when (raw?.uppercase()) {
             "USB_HID" -> USB_HID
+            "MAC_BRIDGE" -> MAC_BRIDGE
             else -> LAN
         }
     }

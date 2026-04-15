@@ -2,6 +2,11 @@
 
 package com.example.deckbridge.ui.connect
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,6 +29,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material.icons.outlined.LaptopMac
 import androidx.compose.material.icons.outlined.Usb
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -38,6 +44,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -46,6 +53,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.deckbridge.R
+import com.example.deckbridge.domain.model.AppState
+import com.example.deckbridge.domain.model.HostDeliveryChannel
 import com.example.deckbridge.domain.model.LanAgentListScanState
 import com.example.deckbridge.domain.model.LanDiscoveredAgent
 import com.example.deckbridge.lan.LanDiscovery
@@ -149,16 +158,21 @@ fun PcConnectionHomeScreen(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    CircleIcon(Icons.Default.Wifi)
-                    CircleIcon(Icons.Outlined.Usb)
+                    if (app.hostDeliveryChannel == HostDeliveryChannel.MAC_BRIDGE) {
+                        CircleIcon(Icons.Outlined.LaptopMac)
+                    } else {
+                        CircleIcon(Icons.Default.Wifi)
+                        CircleIcon(Icons.Outlined.Usb)
+                    }
                 }
                 Spacer(Modifier.height(20.dp))
                 Text(
                     text = stringResource(
-                        if (addAnotherHost) {
-                            R.string.connect_title_add_host
-                        } else {
-                            R.string.connect_title
+                        when {
+                            app.hostDeliveryChannel == HostDeliveryChannel.MAC_BRIDGE ->
+                                R.string.connect_title_mac_bridge
+                            addAnotherHost -> R.string.connect_title_add_host
+                            else -> R.string.connect_title
                         },
                     ),
                     color = OnboardingTheme.textPrimary,
@@ -170,10 +184,11 @@ fun PcConnectionHomeScreen(
                 Spacer(Modifier.height(10.dp))
                 Text(
                     text = stringResource(
-                        if (addAnotherHost) {
-                            R.string.connect_subtitle_add_host
-                        } else {
-                            R.string.connect_subtitle
+                        when {
+                            app.hostDeliveryChannel == HostDeliveryChannel.MAC_BRIDGE ->
+                                R.string.connect_subtitle_mac_bridge
+                            addAnotherHost -> R.string.connect_subtitle_add_host
+                            else -> R.string.connect_subtitle
                         },
                     ),
                     color = OnboardingTheme.textSecondary,
@@ -182,7 +197,39 @@ fun PcConnectionHomeScreen(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(22.dp))
-                if (app.lanPersistedPairActive && pairing == null) {
+                if (app.hostDeliveryChannel == HostDeliveryChannel.MAC_BRIDGE) {
+                    MacBridgeStatusSection(app = app)
+                    Spacer(Modifier.height(14.dp))
+                    Text(
+                        text = stringResource(R.string.mac_bridge_qr_hint),
+                        color = OnboardingTheme.textMuted,
+                        fontSize = 12.sp,
+                        lineHeight = 17.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    TextButton(
+                        onClick = onOpenQr,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(OnboardingTheme.listRow),
+                    ) {
+                        Icon(
+                            Icons.Default.QrCode2,
+                            contentDescription = null,
+                            tint = OnboardingTheme.textPrimary,
+                            modifier = Modifier.size(22.dp),
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            text = stringResource(R.string.mac_bridge_scan_qr_cta),
+                            color = OnboardingTheme.textPrimary,
+                            fontSize = 15.sp,
+                        )
+                    }
+                } else if (app.lanPersistedPairActive && pairing == null) {
                     Text(
                         text = stringResource(
                             if (addAnotherHost) {
@@ -211,6 +258,7 @@ fun PcConnectionHomeScreen(
                             .padding(bottom = 10.dp),
                     )
                 }
+                if (app.hostDeliveryChannel != HostDeliveryChannel.MAC_BRIDGE) {
                 if (scan is LanAgentListScanState.Failed) {
                     Text(
                         text = stringResource(
@@ -371,13 +419,15 @@ fun PcConnectionHomeScreen(
                         )
                     }
                 }
+                } // end MAC_BRIDGE guard
                 Spacer(Modifier.height(14.dp))
                 Text(
                     text = stringResource(
-                        if (addAnotherHost) {
-                            R.string.connect_hint_add_host
-                        } else {
-                            R.string.connect_hint
+                        when {
+                            app.hostDeliveryChannel == HostDeliveryChannel.MAC_BRIDGE ->
+                                R.string.mac_bridge_connect_hint
+                            addAnotherHost -> R.string.connect_hint_add_host
+                            else -> R.string.connect_hint
                         },
                     ),
                     color = OnboardingTheme.textMuted,
@@ -426,6 +476,94 @@ fun PcConnectionHomeScreen(
         }
     }
 }
+
+// ── Mac Bridge status section ─────────────────────────────────────────────────
+
+@Composable
+private fun MacBridgeStatusSection(app: AppState) {
+    val alive = app.macBridgeClientAlive
+    val paired = app.lanPersistedPairActive
+    val clientIp = app.macBridgeClientIp
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(OnboardingTheme.listRow)
+            .padding(horizontal = 20.dp, vertical = 20.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            MacBridgeStatusDot(alive = alive)
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(
+                    text = stringResource(
+                        when {
+                            alive && paired -> R.string.mac_bridge_status_linked
+                            alive -> R.string.mac_bridge_status_connected
+                            else -> R.string.mac_bridge_status_waiting
+                        },
+                    ),
+                    color = OnboardingTheme.textPrimary,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 16.sp,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = when {
+                        alive && clientIp != null ->
+                            stringResource(R.string.mac_bridge_client_polling, clientIp)
+                        paired -> stringResource(R.string.mac_bridge_paired_hint)
+                        else -> stringResource(R.string.mac_bridge_unpaired_hint)
+                    },
+                    color = OnboardingTheme.textMuted,
+                    fontSize = 12.sp,
+                )
+            }
+        }
+        if (!alive) {
+            Spacer(Modifier.height(16.dp))
+            Text(
+                text = stringResource(R.string.mac_bridge_setup_instructions),
+                color = OnboardingTheme.textSecondary,
+                fontSize = 13.sp,
+                lineHeight = 19.sp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun MacBridgeStatusDot(alive: Boolean) {
+    if (alive) {
+        Box(
+            modifier = Modifier
+                .size(12.dp)
+                .clip(CircleShape)
+                .background(Color(0xFF2EE6A0)),
+        )
+    } else {
+        val pulse = rememberInfiniteTransition(label = "bridge_pulse")
+        val scale by pulse.animateFloat(
+            initialValue = 0.75f,
+            targetValue = 1.1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(900),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "bridge_dot_scale",
+        )
+        Box(
+            modifier = Modifier
+                .size(12.dp)
+                .scale(scale)
+                .clip(CircleShape)
+                .background(Color(0xFFFFB020)),
+        )
+    }
+}
+
+// ── LAN agent helpers ─────────────────────────────────────────────────────────
 
 @Composable
 private fun LanAgentStatusSubtitle(row: LanAgentRowUiState) {
