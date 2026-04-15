@@ -8,6 +8,8 @@ import com.example.deckbridge.domain.model.HostDeliveryChannel
 import com.example.deckbridge.hid.HidGadgetSession
 import com.example.deckbridge.lan.LanHostClient
 import com.example.deckbridge.lan.LanTransportDispatcher
+import com.example.deckbridge.mac.MacBridgeDispatcher
+import com.example.deckbridge.mac.MacBridgeServer
 import com.example.deckbridge.data.preferences.deckBridgePreferences
 import com.example.deckbridge.data.repository.DeckBridgeRepository
 import com.example.deckbridge.data.repository.DeckBridgeRepositoryImpl
@@ -35,11 +37,14 @@ class DeckBridgeApplication : Application() {
         val hidTransportDispatcher = HidTransportDispatcher(hidGadgetSession, loggingDispatcher)
         val lanHostClient = LanHostClient()
         val lanTransportDispatcher = LanTransportDispatcher(lanHostClient, loggingDispatcher)
+        val macBridgeServer = MacBridgeServer()
+        val macBridgeDispatcher = MacBridgeDispatcher(macBridgeServer)
         val hostDeliveryChannelRef = AtomicReference(HostDeliveryChannel.LAN)
         val hostDeliveryRouter = HostDeliveryRouter(
             hostDeliveryChannelRef,
             lanTransportDispatcher,
             hidTransportDispatcher,
+            macBridgeDispatcher,
         )
         repository = DeckBridgeRepositoryImpl(
             appContext = this,
@@ -48,6 +53,7 @@ class DeckBridgeApplication : Application() {
             lanHostClient = lanHostClient,
             hidTransportDispatcher = hidTransportDispatcher,
             hidGadgetSession = hidGadgetSession,
+            macBridgeServer = macBridgeServer,
             dataStore = deckBridgePreferences(),
         )
         repository.refreshAttachedKeyboards()

@@ -92,6 +92,7 @@ import com.example.deckbridge.device.EmulatorDetector
 import com.example.deckbridge.device.PrivilegedShellProbe
 import com.example.deckbridge.hid.HidGadgetSession
 import com.example.deckbridge.host.HostOsDetector
+import com.example.deckbridge.mac.MacBridgeServer
 import com.example.deckbridge.lan.LanAgentProbeSnapshot
 import com.example.deckbridge.lan.LanDiscovery
 import com.example.deckbridge.lan.LanHealthResult
@@ -149,6 +150,7 @@ class DeckBridgeRepositoryImpl(
     private val lanHostClient: LanHostClient,
     private val hidTransportDispatcher: HidTransportDispatcher,
     private val hidGadgetSession: HidGadgetSession,
+    private val macBridgeServer: MacBridgeServer,
     private val dataStore: DataStore<Preferences>,
 ) : DeckBridgeRepository {
 
@@ -181,6 +183,7 @@ class DeckBridgeRepositoryImpl(
     private var deviceRefreshJob: Job? = null
     private var hostTransportRefreshJob: Job? = null
     private var lanForegroundDiscoveryJob: Job? = null
+    private var macBridgeStateJob: Job? = null
 
     @Volatile
     private var lastKeyboardScanElapsedRealtime: Long = 0L
@@ -791,6 +794,23 @@ class DeckBridgeRepositoryImpl(
         }
     }
 
+    private fun startMacBridgeStatePolling() {
+        if (macBridgeStateJob?.isActive == true) return
+        macBridgeStateJob = externalScope.launch {
+            while (true) {
+                val alive = macBridgeServer.isClientAlive()
+                val ip = macBridgeServer.peekClientIp()
+                _appState.update { it.copy(macBridgeClientAlive = alive, macBridgeClientIp = if (alive) ip else null) }
+                delay(3_000)
+            }
+        }
+    }
+
+    private fun stopMacBridgeStatePolling() {
+        macBridgeStateJob?.cancel()
+        macBridgeStateJob = null
+    }
+
     private fun lanPlatformForEndpoints(): HostPlatform =
         _appState.value.hostPlatform.normalizeForLanPersistence()
 
@@ -836,6 +856,12 @@ class DeckBridgeRepositoryImpl(
         hostDeliveryRouter.setChannel(channel)
         _appState.update { prev -> prev.copy(hostDeliveryChannel = channel) }
         applyLanClientFromPersistedStore("bootstrap LAN")
+        if (channel == HostDeliveryChannel.MAC_BRIDGE) {
+            val tok = dataStore.readLanPairTokenForPlatform(HostPlatform.MAC).trim().takeIf { it.isNotEmpty() }
+            macBridgeServer.setPairToken(tok)
+            macBridgeServer.start(externalScope)
+            startMacBridgeStatePolling()
+        }
         DeckBridgeLog.state(
             "LAN bootstrap channel=$channel slot=${lanPlatformForEndpoints()} " +
                 "host=${if (_appState.value.lanServerHost.isBlank()) "—" else _appState.value.lanServerHost} " +
@@ -981,8 +1007,20 @@ class DeckBridgeRepositoryImpl(
             hostDeliveryRouter.setChannel(channel)
             _appState.update { prev -> prev.copy(hostDeliveryChannel = channel) }
             DeckBridgeLog.state("hostDeliveryChannel=$channel skipLanDiscovery=$skipLanDiscovery")
-            if (channel == HostDeliveryChannel.LAN && !skipLanDiscovery) {
-                attemptLanUdpDiscoveryAndHealth()
+            if (channel == HostDeliveryChannel.MAC_BRIDGE) {
+                if (!macBridgeServer.isRunning) {
+                    val tok = dataStore.readLanPairTokenForPlatform(HostPlatform.MAC).trim().takeIf { it.isNotEmpty() }
+                    macBridgeServer.setPairToken(tok)
+                    macBridgeServer.start(externalScope)
+                }
+                startMacBridgeStatePolling()
+            } else {
+                stopMacBridgeStatePolling()
+                if (macBridgeServer.isRunning) macBridgeServer.stop()
+                _appState.update { it.copy(macBridgeClientIp = null, macBridgeClientAlive = false) }
+                if (channel == HostDeliveryChannel.LAN && !skipLanDiscovery) {
+                    attemptLanUdpDiscoveryAndHealth()
+                }
             }
         }
     }
@@ -1126,6 +1164,7 @@ class DeckBridgeRepositoryImpl(
         val plat = lanPlatformForEndpoints()
         dataStore.writeLanPairTokenForPlatform(plat, pairToken)
         lanHostClient.setPairToken(pairToken)
+        if (plat == HostPlatform.MAC) macBridgeServer.setPairToken(pairToken)
         _appState.update { prev ->
             prev.copy(
                 lanPersistedPairActive = true,
@@ -1143,6 +1182,7 @@ class DeckBridgeRepositoryImpl(
         val plat = lanPlatformForEndpoints()
         dataStore.writeLanPairTokenForPlatform(plat, null)
         lanHostClient.setPairToken(null)
+        if (plat == HostPlatform.MAC) macBridgeServer.setPairToken(null)
         _appState.update { prev ->
             prev.copy(
                 lanPersistedPairActive = false,
@@ -1160,6 +1200,7 @@ class DeckBridgeRepositoryImpl(
                 dataStore.writeSkipInitialPcConnect(false)
             }
             lanHostClient.setPairToken(null)
+            if (plat == HostPlatform.MAC) macBridgeServer.setPairToken(null)
             _skipInitialPcConnect.value = false
             _appState.update { prev ->
                 prev.copy(

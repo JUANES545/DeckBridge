@@ -461,6 +461,24 @@ private fun LanPcAgentCard(
                 modifier = Modifier.padding(start = 4.dp),
             )
         }
+        if (state.hostPlatform == HostPlatform.MAC) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onChannel(HostDeliveryChannel.MAC_BRIDGE) },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RadioButton(
+                    selected = state.hostDeliveryChannel == HostDeliveryChannel.MAC_BRIDGE,
+                    onClick = { onChannel(HostDeliveryChannel.MAC_BRIDGE) },
+                )
+                Text(
+                    text = stringResource(R.string.settings_lan_channel_mac_bridge),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(start = 4.dp),
+                )
+            }
+        }
         Spacer(Modifier.height(12.dp))
         OutlinedTextField(
             value = hostDraft,

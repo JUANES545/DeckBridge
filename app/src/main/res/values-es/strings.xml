@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">DeckBridge</string>
+    <string name="splash_tagline">Superior</string>
 
     <string name="section_system_status">Estado del sistema</string>
     <string name="section_host_platform_deck">Plataforma del equipo (atajos)</string>
@@ -279,6 +280,9 @@
     <string name="dash_lan_trust">LAN · hay que volver a enlazar</string>
     <string name="dash_lan_no_host">LAN · elige un ordenador</string>
     <string name="dash_connection_dot_a11y">Conexión: %1$s. %2$s</string>
+    <string name="dash_mac_bridge_waiting">Mac Bridge · esperando</string>
+    <string name="dash_mac_bridge_connected">Mac Bridge · conectado</string>
+    <string name="dash_mac_bridge_linked">Mac Bridge · vinculado</string>
 
     <string name="settings_calibration_wizard_section">Disposición del hardware</string>
     <string name="settings_calibration_wizard_hint">Aprende las teclas del pad y las perillas en el dispositivo físico. Puedes repetirlo cuando quieras.</string>
@@ -308,6 +312,7 @@
     <string name="settings_lan_channel_title">Cómo llegan las acciones al PC</string>
     <string name="settings_lan_channel_lan">LAN / Wi‑Fi (agente HTTP en el PC)</string>
     <string name="settings_lan_channel_usb_hid">USB HID (gadget /dev/hidg*)</string>
+    <string name="settings_lan_channel_mac_bridge">Mac Bridge (servidor en Android · funciona con VPN corporativa)</string>
     <string name="settings_lan_host_label">Nombre o IP del PC</string>
     <string name="settings_lan_host_placeholder">p. ej. 192.168.1.10</string>
     <string name="settings_lan_port_label">Puerto</string>
@@ -453,4 +458,18 @@
     <string name="connect_qr_phase_claiming">Vinculando este teléfono a la sesión…</string>
     <string name="connect_qr_phase_waiting_pc">Esperando aprobación en el PC…</string>
     <string name="connect_qr_session_other_device">Este código de emparejamiento es para otro teléfono.</string>
+
+    <!-- Mac Bridge pantalla de conexión -->
+    <string name="connect_title_mac_bridge">Mac Bridge</string>
+    <string name="connect_subtitle_mac_bridge">Tu Android actúa como servidor. El agente Mac se conecta de salida — funciona incluso con VPN corporativa.</string>
+    <string name="mac_bridge_status_waiting">Esperando agente Mac…</string>
+    <string name="mac_bridge_status_connected">Mac conectado</string>
+    <string name="mac_bridge_status_linked">Mac vinculado</string>
+    <string name="mac_bridge_client_polling">Sondeos desde %s</string>
+    <string name="mac_bridge_paired_hint">Vinculado · se reconecta automáticamente</string>
+    <string name="mac_bridge_unpaired_hint">Sin vincular · escanea el QR para enlazar</string>
+    <string name="mac_bridge_setup_instructions">Inicia el agente Mac (python3 server.py). Por cable USB la conexión es automática — sin configurar IP. Por Wi‑Fi sin cable, pon la IP del teléfono en ~/.deckbridge/mac_bridge.json en la Mac.</string>
+    <string name="mac_bridge_qr_hint">¿Primera vez? Vincula teléfono ↔ Mac escaneando el QR del agente (pulsa z en la consola).</string>
+    <string name="mac_bridge_scan_qr_cta">Escanear QR del agente Mac para vincular</string>
+    <string name="mac_bridge_connect_hint">El servidor Mac Bridge corre en este teléfono. El agente Mac se conecta de salida — sin firewall ni IP por cable USB.</string>
 </resources>
