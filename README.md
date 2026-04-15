@@ -63,25 +63,33 @@ Suggested reading order: **first run → home → settings**.
 
 Guided first run; **Skip** sits top-right if you already use DeckBridge on another install.
 
-<p align="center"><img src="docs/readme/screenshots/01-onboarding.png" width="280" alt="DeckBridge onboarding screen"/></p>
+<p align="center">
+  <img src="https://raw.githubusercontent.com/JUANES545/DeckBridge/master/docs/readme/screenshots/01-onboarding.png" width="280" alt="DeckBridge onboarding screen" />
+</p>
 
 ### 2 · After onboarding
 
 Connection gate or hand-off before you land on the main deck—this is where **PC / agent pairing** starts when you choose it.
 
-<p align="center"><img src="docs/readme/screenshots/02-after-onboarding.png" width="280" alt="DeckBridge post-onboarding or connection gate"/></p>
+<p align="center">
+  <img src="https://raw.githubusercontent.com/JUANES545/DeckBridge/master/docs/readme/screenshots/02-after-onboarding.png" width="280" alt="DeckBridge post-onboarding or connection gate" />
+</p>
 
 ### 3 · Dashboard
 
 **Hardware mirror**, deck grid, and host platform context—where you spend most of your time.
 
-<p align="center"><img src="docs/readme/screenshots/03-dashboard.png" width="280" alt="DeckBridge dashboard with mirror"/></p>
+<p align="center">
+  <img src="https://raw.githubusercontent.com/JUANES545/DeckBridge/master/docs/readme/screenshots/03-dashboard.png" width="280" alt="DeckBridge dashboard with mirror" />
+</p>
 
 ### 4 · Settings
 
 **Agents & delivery**: discovery, LAN endpoint, health checks, **add another computer**, calibration entry, and advanced toggles.
 
-<p align="center"><img src="docs/readme/screenshots/04-settings.png" width="280" alt="DeckBridge settings"/></p>
+<p align="center">
+  <img src="https://raw.githubusercontent.com/JUANES545/DeckBridge/master/docs/readme/screenshots/04-settings.png" width="280" alt="DeckBridge settings" />
+</p>
 
 ```mermaid
 flowchart LR
