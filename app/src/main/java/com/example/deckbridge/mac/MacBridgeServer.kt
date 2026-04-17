@@ -10,11 +10,16 @@ import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.PrintWriter
+import java.net.DatagramPacket
+import java.net.DatagramSocket
+import java.net.NetworkInterface
 import java.net.ServerSocket
 import java.net.Socket
+import java.net.SocketTimeoutException
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
@@ -57,19 +62,27 @@ class MacBridgeServer {
     private val actionQueue = ArrayBlockingQueue<String>(64)
     private val running = AtomicBoolean(false)
     private var serverSocket: ServerSocket? = null
+    private val droppedActionCount = AtomicInteger(0)
+    private val discoverySocket = AtomicReference<DatagramSocket?>(null)
 
     val isRunning: Boolean get() = running.get()
+
+    /** Returns the number of actions dropped due to a full queue since the last call, then resets to 0. */
+    fun peekAndResetDropCount(): Int = droppedActionCount.getAndSet(0)
 
     fun start(scope: CoroutineScope) {
         if (!running.compareAndSet(false, true)) return
         scope.launch(Dispatchers.IO) { acceptLoop() }
+        scope.launch(Dispatchers.IO) { discoveryLoop() }
         DeckBridgeLog.lan("MacBridgeServer starting on port $PORT")
     }
 
     fun stop() {
         if (!running.compareAndSet(true, false)) return
         serverSocket?.runCatching { close() }
+        discoverySocket.getAndSet(null)?.runCatching { close() }
         actionQueue.clear()
+        droppedActionCount.set(0)
         DeckBridgeLog.lan("MacBridgeServer stopped")
     }
 
@@ -79,7 +92,8 @@ class MacBridgeServer {
      */
     fun enqueueAction(intentId: String, actionJson: String) {
         val offered = actionQueue.offer(actionJson)
-        DeckBridgeLog.lan("MacBridge enqueue intent=$intentId queued=$offered queueSize=${actionQueue.size}")
+        if (!offered) droppedActionCount.incrementAndGet()
+        DeckBridgeLog.lan("MacBridge enqueue intent=$intentId queued=$offered queueSize=${actionQueue.size}${if (!offered) " ⚠ DROPPED" else ""}")
     }
 
     // ── Server loop ──────────────────────────────────────────────────────────
@@ -167,6 +181,55 @@ class MacBridgeServer {
         }
     }
 
+    // ── UDP discovery responder ───────────────────────────────────────────────
+
+    /**
+     * Listens on UDP port [DISCOVERY_PORT] for `DECKBRIDGE_DISCOVER_v1` broadcasts from the Mac
+     * agent and replies with the phone's WiFi IP + [PORT], so the Mac can find the Android without
+     * manual config when ADB is unavailable.
+     */
+    private fun discoveryLoop() {
+        try {
+            val sock = DatagramSocket(DISCOVERY_PORT).also {
+                it.reuseAddress = true
+                it.soTimeout = 500
+            }
+            discoverySocket.set(sock)
+            val buf = ByteArray(256)
+            val recv = DatagramPacket(buf, buf.size)
+            DeckBridgeLog.lan("MacBridgeServer UDP discovery listening on port $DISCOVERY_PORT")
+            while (running.get()) {
+                try {
+                    sock.receive(recv)
+                    val body = String(recv.data, recv.offset, recv.length, Charsets.UTF_8).trim()
+                    if (body == DISCOVERY_MAGIC) {
+                        val myIp = localWifiIp() ?: continue
+                        val reply = """{"ok":true,"ip":"$myIp","port":$PORT,"agent_os":"android"}"""
+                            .toByteArray(Charsets.UTF_8)
+                        sock.send(DatagramPacket(reply, reply.size, recv.address, recv.port))
+                        DeckBridgeLog.lan("MacBridge discovery: replied ip=$myIp to ${recv.address.hostAddress}")
+                    }
+                } catch (_: SocketTimeoutException) { /* loop tick — check running.get() */ }
+            }
+        } catch (e: Exception) {
+            if (running.get()) DeckBridgeLog.lan("MacBridge discovery loop error: ${e.message}")
+        } finally {
+            discoverySocket.getAndSet(null)?.runCatching { close() }
+        }
+    }
+
+    /** First non-loopback, non-link-local IPv4 address — the phone's WiFi IP. */
+    private fun localWifiIp(): String? = runCatching {
+        NetworkInterface.getNetworkInterfaces()?.toList()
+            ?.filter { it.isUp && !it.isLoopback }
+            ?.flatMap { it.inetAddresses.toList() }
+            ?.firstOrNull { addr ->
+                val h = addr.hostAddress ?: return@firstOrNull false
+                !addr.isLoopbackAddress && !addr.isLinkLocalAddress && !h.contains(':')
+            }
+            ?.hostAddress
+    }.getOrNull()
+
     // ── HTTP helpers ──────────────────────────────────────────────────────────
 
     private fun sendJson(out: PrintWriter, code: Int, body: String) {
@@ -185,6 +248,9 @@ class MacBridgeServer {
 
     companion object {
         const val PORT = 8767
+        /** UDP port on which the Android server listens for Mac agent discovery broadcasts. */
+        const val DISCOVERY_PORT = 8766
+        private const val DISCOVERY_MAGIC = "DECKBRIDGE_DISCOVER_v1"
         private const val LONG_POLL_TIMEOUT_MS = 55_000
         /** A client is "alive" if it polled within this window (55s timeout + 35s grace). */
         const val CLIENT_ALIVE_WINDOW_MS = 90_000L

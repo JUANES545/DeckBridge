@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -29,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.rememberNavController
 import com.example.deckbridge.host.HostOsDetector
+import com.example.deckbridge.service.DeckBridgeService
 import com.example.deckbridge.ui.navigation.DeckBridgeDestinations
 import com.example.deckbridge.ui.navigation.DeckBridgeNavHost
 import com.example.deckbridge.ui.onboarding.OnboardingFlow
@@ -89,34 +89,12 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
                             else -> {
-                                val skip by repo.skipInitialPcConnect.collectAsStateWithLifecycle(initialValue = null)
-                                val gate by repo.initialConnectGateActive.collectAsStateWithLifecycle(initialValue = false)
-                                when (skip) {
-                                    null -> {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .background(OnboardingTheme.background),
-                                            contentAlignment = Alignment.Center,
-                                        ) {
-                                            CircularProgressIndicator(color = OnboardingTheme.accent)
-                                        }
-                                    }
-                                    else -> {
-                                        key(gate) {
-                                            val navController = rememberNavController()
-                                            DeckBridgeNavHost(
-                                                navController = navController,
-                                                modifier = Modifier.fillMaxSize(),
-                                                startDestination = if (gate) {
-                                                    DeckBridgeDestinations.connectGraphRoute(addAnotherHost = false)
-                                                } else {
-                                                    DeckBridgeDestinations.HOME
-                                                },
-                                            )
-                                        }
-                                    }
-                                }
+                                val navController = rememberNavController()
+                                DeckBridgeNavHost(
+                                    navController = navController,
+                                    modifier = Modifier.fillMaxSize(),
+                                    startDestination = DeckBridgeDestinations.HOME,
+                                )
                             }
                         }
                     }
@@ -127,6 +105,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        // Stop background service — app is visible again.
+        DeckBridgeService.stop(this)
         val filter = IntentFilter(HostOsDetector.USB_STATE_INTENT_ACTION)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(usbStateReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
@@ -150,6 +130,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         SessionFileLog.flush()
+        // Keep connections alive in the background via foreground service.
+        DeckBridgeService.start(this)
         super.onStop()
     }
 

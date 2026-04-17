@@ -18,7 +18,7 @@ import com.example.deckbridge.domain.model.InputDiagnostics
 import com.example.deckbridge.domain.model.PhysicalKeyBinding
 import com.example.deckbridge.domain.model.PhysicalKeyboardConnectionState
 import com.example.deckbridge.domain.model.PhysicalKeyboardStatus
-import com.example.deckbridge.lan.LanHostClient
+import com.example.deckbridge.domain.model.PlatformSlotState
 import com.example.deckbridge.profiles.Profile
 
 /**
@@ -129,15 +129,9 @@ object DeckCatalog {
             hidPcModeEnabled = false,
             privilegedShellAvailable = false,
             hidDebugLine = "",
-            hostDeliveryChannel = HostDeliveryChannel.LAN,
-            lanServerHost = "",
-            lanServerPort = LanHostClient.DEFAULT_PORT,
-            lanHealthOk = null,
-            lanHealthDetail = null,
-            lanPersistedPairActive = false,
-            lanPairTokenValid = null,
-            lanTrustOk = true,
             animatedBackgroundMode = AnimatedBackgroundMode.WHEN_CHARGING,
+            windowsSlot = PlatformSlotState(channel = HostDeliveryChannel.LAN),
+            macSlot = PlatformSlotState(channel = HostDeliveryChannel.MAC_BRIDGE),
         )
     }
 

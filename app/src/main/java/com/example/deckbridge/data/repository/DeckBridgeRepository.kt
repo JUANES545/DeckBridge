@@ -6,6 +6,7 @@ import com.example.deckbridge.domain.deck.DeckGridButtonPersisted
 import com.example.deckbridge.domain.deck.DeckKnobPersisted
 import com.example.deckbridge.domain.hardware.CalibrationSessionUi
 import com.example.deckbridge.domain.model.AnimatedBackgroundMode
+import com.example.deckbridge.domain.model.AnimatedBackgroundTheme
 import com.example.deckbridge.domain.model.AppState
 import com.example.deckbridge.domain.model.ButtonTriggerSource
 import com.example.deckbridge.domain.model.HostDeliveryChannel
@@ -100,6 +101,7 @@ interface DeckBridgeRepository {
 
     /** Persisted: subtle animated home background (always / while charging / off). */
     fun setAnimatedBackgroundMode(mode: AnimatedBackgroundMode)
+    fun setAnimatedBackgroundTheme(theme: AnimatedBackgroundTheme)
 
     /** Persisted: route deck actions to the LAN HTTP agent vs USB gadget HID. */
     fun setHostDeliveryChannel(channel: HostDeliveryChannel, skipLanDiscovery: Boolean = false)
@@ -152,6 +154,18 @@ interface DeckBridgeRepository {
      */
     fun forgetTrustedLanHostLink()
 
+    /** Persisted LAN endpoint for a specific platform slot (not necessarily the active one). */
+    fun setLanEndpointForPlatform(platform: HostPlatform, host: String, port: Int)
+
+    /** Probes /health for the given platform slot (does not change active endpoint). */
+    fun testLanHealthForPlatform(platform: HostPlatform)
+
+    /** Clears pair token and trust for the given platform slot. */
+    fun forgetTrustedLanHostLinkForPlatform(platform: HostPlatform)
+
+    /** Sets the Mac slot's delivery channel (LAN or MAC_BRIDGE). */
+    fun setMacSlotChannel(channel: HostDeliveryChannel)
+
     /**
      * When delivery is LAN: UDP discovery for the PC agent, then `/health`.
      * Debounced; call from [android.app.Activity.onResume] so reopening the app re-syncs after DHCP changes.
@@ -194,4 +208,10 @@ interface DeckBridgeRepository {
 
     /** Replaces one knob with the factory preset for the same id (keeps [DeckKnobPersisted.sortIndex]). */
     suspend fun resetDeckKnobToDefault(knobId: String): Result<Unit>
+
+    /**
+     * Release system resources held by the repository (e.g. [android.hardware.input.InputManager]
+     * listener). Call when the owning lifecycle is permanently destroyed.
+     */
+    fun cleanup()
 }

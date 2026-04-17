@@ -1,5 +1,8 @@
 package com.example.deckbridge.ui.settings
 
+import android.accessibilityservice.AccessibilityServiceInfo
+import android.content.ComponentName
+import android.view.accessibility.AccessibilityManager
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -19,6 +22,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -41,6 +46,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -52,6 +58,7 @@ import com.example.deckbridge.domain.hardware.HardwareDiagSummary
 import com.example.deckbridge.domain.hardware.RawChannel
 import com.example.deckbridge.domain.hardware.RawDiagnosticLine
 import com.example.deckbridge.domain.model.AnimatedBackgroundMode
+import com.example.deckbridge.domain.model.AnimatedBackgroundTheme
 import com.example.deckbridge.domain.model.AppState
 import com.example.deckbridge.domain.model.ButtonTriggerSource
 import com.example.deckbridge.domain.model.DeckActivationLogEntry
@@ -60,6 +67,7 @@ import com.example.deckbridge.domain.model.HostPlatform
 import com.example.deckbridge.domain.model.HostPlatformSource
 import com.example.deckbridge.domain.model.HostUsbConnectionState
 import com.example.deckbridge.domain.model.PhysicalKeyboardConnectionState
+import com.example.deckbridge.domain.model.PlatformSlotState
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
@@ -73,12 +81,21 @@ fun SettingsScreen(
     onRefreshKeyboards: () -> Unit,
     onHostAutoDetectChanged: (Boolean) -> Unit,
     onHidPcModeChanged: (Boolean) -> Unit,
-    onHostDeliveryChannelChanged: (HostDeliveryChannel) -> Unit,
-    onApplyLanEndpoint: (String, Int) -> Unit,
-    onTestLanHealth: () -> Unit,
-    onForgetLanLink: () -> Unit,
+    onHostDeliveryChannelChanged: (HostDeliveryChannel) -> Unit = {},
+    onApplyLanEndpoint: (String, Int) -> Unit = { _, _ -> },
+    onTestLanHealth: () -> Unit = {},
+    onForgetLanLink: () -> Unit = {},
+    onApplyWindowsEndpoint: (String, Int) -> Unit = { _, _ -> },
+    onTestWindowsHealth: () -> Unit = {},
+    onForgetWindowsLink: () -> Unit = {},
+    onApplyMacEndpoint: (String, Int) -> Unit = { _, _ -> },
+    onTestMacHealth: () -> Unit = {},
+    onForgetMacLink: () -> Unit = {},
+    onSetMacSlotChannel: (HostDeliveryChannel) -> Unit = {},
     onOpenHardwareCalibration: () -> Unit = {},
     onAnimatedBackgroundModeChanged: (AnimatedBackgroundMode) -> Unit = {},
+    onAnimatedBackgroundThemeChanged: (AnimatedBackgroundTheme) -> Unit = {},
+    onOpenAccessibilitySettings: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     LaunchedEffect(Unit) {
@@ -115,9 +132,14 @@ fun SettingsScreen(
 
             SectionLabel(stringResource(R.string.settings_section_animated_background))
             AnimatedBackgroundPreferenceCard(
-                selected = state.animatedBackgroundMode,
-                onSelect = onAnimatedBackgroundModeChanged,
+                selectedMode = state.animatedBackgroundMode,
+                selectedTheme = state.animatedBackgroundTheme,
+                onSelectMode = onAnimatedBackgroundModeChanged,
+                onSelectTheme = onAnimatedBackgroundThemeChanged,
             )
+
+            SectionLabel(stringResource(R.string.settings_section_background))
+            AccessibilityServiceCard(onOpenAccessibilitySettings = onOpenAccessibilitySettings)
 
             SectionLabel(stringResource(R.string.settings_section_session))
             LiveHardwareSessionCard(
@@ -145,13 +167,24 @@ fun SettingsScreen(
             SectionLabel(stringResource(R.string.settings_section_keyboard_host))
             KeyboardHostCompactCard(state = state)
 
-            SectionLabel(stringResource(R.string.settings_section_lan_pc))
-            LanPcAgentCard(
-                state = state,
-                onChannel = onHostDeliveryChannelChanged,
-                onApplyLan = onApplyLanEndpoint,
-                onTestLan = onTestLanHealth,
-                onForgetLanLink = onForgetLanLink,
+            SectionLabel(stringResource(R.string.settings_section_windows_pc))
+            SlotCard(
+                slot = state.windowsSlot,
+                showChannelSelector = false,
+                onApply = onApplyWindowsEndpoint,
+                onTest = onTestWindowsHealth,
+                onForget = onForgetWindowsLink,
+                onSetChannel = {},
+            )
+
+            SectionLabel(stringResource(R.string.settings_section_mac))
+            SlotCard(
+                slot = state.macSlot,
+                showChannelSelector = true,
+                onApply = onApplyMacEndpoint,
+                onTest = onTestMacHealth,
+                onForget = onForgetMacLink,
+                onSetChannel = onSetMacSlotChannel,
             )
 
             SectionLabel(stringResource(R.string.settings_section_hid_host))
@@ -237,10 +270,13 @@ private fun LogcatHintCard() {
 
 @Composable
 private fun AnimatedBackgroundPreferenceCard(
-    selected: AnimatedBackgroundMode,
-    onSelect: (AnimatedBackgroundMode) -> Unit,
+    selectedMode: AnimatedBackgroundMode,
+    selectedTheme: AnimatedBackgroundTheme,
+    onSelectMode: (AnimatedBackgroundMode) -> Unit,
+    onSelectTheme: (AnimatedBackgroundTheme) -> Unit,
 ) {
     ElevatedInfoCard {
+        // — When to activate —
         Text(
             text = stringResource(R.string.settings_animated_bg_hint),
             style = MaterialTheme.typography.bodySmall,
@@ -249,19 +285,62 @@ private fun AnimatedBackgroundPreferenceCard(
         Spacer(Modifier.height(10.dp))
         AnimatedBackgroundRadioRow(
             label = stringResource(R.string.settings_animated_bg_always),
-            chosen = selected == AnimatedBackgroundMode.ALWAYS,
-            onClick = { onSelect(AnimatedBackgroundMode.ALWAYS) },
+            chosen = selectedMode == AnimatedBackgroundMode.ALWAYS,
+            onClick = { onSelectMode(AnimatedBackgroundMode.ALWAYS) },
         )
         AnimatedBackgroundRadioRow(
             label = stringResource(R.string.settings_animated_bg_charging),
-            chosen = selected == AnimatedBackgroundMode.WHEN_CHARGING,
-            onClick = { onSelect(AnimatedBackgroundMode.WHEN_CHARGING) },
+            chosen = selectedMode == AnimatedBackgroundMode.WHEN_CHARGING,
+            onClick = { onSelectMode(AnimatedBackgroundMode.WHEN_CHARGING) },
         )
         AnimatedBackgroundRadioRow(
             label = stringResource(R.string.settings_animated_bg_off),
-            chosen = selected == AnimatedBackgroundMode.OFF,
-            onClick = { onSelect(AnimatedBackgroundMode.OFF) },
+            chosen = selectedMode == AnimatedBackgroundMode.OFF,
+            onClick = { onSelectMode(AnimatedBackgroundMode.OFF) },
         )
+
+        // — Theme picker (only shown when animation is enabled) —
+        if (selectedMode != AnimatedBackgroundMode.OFF) {
+            Spacer(Modifier.height(14.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f))
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = stringResource(R.string.settings_animated_bg_theme_label),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(Modifier.height(8.dp))
+            AnimatedBackgroundThemeChips(
+                selected = selectedTheme,
+                onSelect = onSelectTheme,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AnimatedBackgroundThemeChips(
+    selected: AnimatedBackgroundTheme,
+    onSelect: (AnimatedBackgroundTheme) -> Unit,
+) {
+    val themes = listOf(
+        AnimatedBackgroundTheme.GRID_PULSE to stringResource(R.string.settings_animated_bg_theme_pulse),
+        AnimatedBackgroundTheme.PARTICLES  to stringResource(R.string.settings_animated_bg_theme_particles),
+        AnimatedBackgroundTheme.AURORA     to stringResource(R.string.settings_animated_bg_theme_aurora),
+    )
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        themes.forEach { (theme, label) ->
+            val isSelected = selected == theme
+            FilterChip(
+                selected = isSelected,
+                onClick = { onSelect(theme) },
+                label = { Text(label, style = MaterialTheme.typography.labelMedium) },
+                modifier = Modifier.weight(1f),
+            )
+        }
     }
 }
 
@@ -399,6 +478,155 @@ private fun knobTitle(index: Int): String = when (index) {
     1 -> stringResource(R.string.knob_middle)
     2 -> stringResource(R.string.knob_bottom)
     else -> stringResource(R.string.knob_generic, index + 1)
+}
+
+@Composable
+private fun SlotCard(
+    slot: PlatformSlotState,
+    showChannelSelector: Boolean,
+    onApply: (String, Int) -> Unit,
+    onTest: () -> Unit,
+    onForget: () -> Unit,
+    onSetChannel: (HostDeliveryChannel) -> Unit,
+) {
+    var hostDraft by remember { mutableStateOf(slot.host) }
+    var portDraft by remember { mutableStateOf(slot.port.toString()) }
+    LaunchedEffect(slot.host, slot.port) {
+        hostDraft = slot.host
+        portDraft = slot.port.toString()
+    }
+
+    ElevatedInfoCard {
+        if (showChannelSelector) {
+            Text(
+                text = stringResource(R.string.settings_lan_channel_title),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = stringResource(R.string.settings_mac_channel_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(10.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onSetChannel(HostDeliveryChannel.LAN) },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RadioButton(
+                    selected = slot.channel == HostDeliveryChannel.LAN,
+                    onClick = { onSetChannel(HostDeliveryChannel.LAN) },
+                )
+                Text(
+                    text = stringResource(R.string.settings_mac_channel_lan),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(start = 4.dp),
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onSetChannel(HostDeliveryChannel.MAC_BRIDGE) },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RadioButton(
+                    selected = slot.channel == HostDeliveryChannel.MAC_BRIDGE,
+                    onClick = { onSetChannel(HostDeliveryChannel.MAC_BRIDGE) },
+                )
+                Text(
+                    text = stringResource(R.string.settings_mac_channel_bridge),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(start = 4.dp),
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+        }
+        OutlinedTextField(
+            value = hostDraft,
+            onValueChange = { hostDraft = it },
+            label = { Text(stringResource(R.string.settings_lan_host_label)) },
+            placeholder = { Text(stringResource(R.string.settings_lan_host_placeholder)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(8.dp))
+        OutlinedTextField(
+            value = portDraft,
+            onValueChange = { v -> portDraft = v.filter { it.isDigit() }.take(5) },
+            label = { Text(stringResource(R.string.settings_lan_port_label)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Button(
+                onClick = {
+                    val p = portDraft.toIntOrNull()?.coerceIn(1, 65_535) ?: slot.port
+                    onApply(hostDraft.trim(), p)
+                },
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(stringResource(R.string.settings_lan_apply))
+            }
+            Button(onClick = onTest) {
+                Text(stringResource(R.string.settings_lan_test_health))
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = when (slot.healthOk) {
+                null -> stringResource(R.string.settings_slot_not_configured)
+                true -> stringResource(R.string.settings_slot_healthy)
+                false -> if (slot.healthRetrying) stringResource(R.string.settings_slot_retrying) else stringResource(R.string.settings_slot_offline)
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = if (slot.trustOk) {
+                stringResource(R.string.settings_lan_trust_ok)
+            } else {
+                stringResource(R.string.settings_slot_trust_lost)
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = if (slot.trustOk) {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            } else {
+                MaterialTheme.colorScheme.error
+            },
+        )
+        if (slot.pairActive) {
+            Spacer(Modifier.height(10.dp))
+            OutlinedButton(
+                onClick = onForget,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.settings_lan_forget_link))
+            }
+        }
+        if (slot.healthOk == false && !slot.healthDetail.isNullOrBlank()) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = slot.healthDetail,
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = stringResource(R.string.settings_lan_security_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+        )
+    }
 }
 
 @Composable
@@ -547,10 +775,11 @@ private fun LanPcAgentCard(
                 Text(stringResource(R.string.settings_lan_forget_link))
             }
         }
-        if (state.lanHealthOk == false && !state.lanHealthDetail.isNullOrBlank()) {
+        val lanDetail = state.lanHealthDetail
+        if (state.lanHealthOk == false && !lanDetail.isNullOrBlank()) {
             Spacer(Modifier.height(6.dp))
             Text(
-                text = state.lanHealthDetail,
+                text = lanDetail,
                 style = MaterialTheme.typography.bodySmall,
                 fontFamily = FontFamily.Monospace,
                 color = MaterialTheme.colorScheme.error,
@@ -903,6 +1132,70 @@ private fun activationSourceLabel(source: ButtonTriggerSource): String = when (s
 private fun formatTime(epochMs: Long): String {
     val fmt = DateFormat.getTimeInstance(DateFormat.SHORT, Locale.getDefault())
     return fmt.format(Date(epochMs))
+}
+
+@Composable
+private fun AccessibilityServiceCard(onOpenAccessibilitySettings: () -> Unit) {
+    val context = LocalContext.current
+    var isEnabled by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        isEnabled = isAccessibilityServiceEnabled(context)
+    }
+    ElevatedInfoCard {
+        Text(
+            text = stringResource(R.string.settings_accessibility_title),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = stringResource(R.string.settings_accessibility_desc),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = if (isEnabled) {
+                    stringResource(R.string.settings_accessibility_status_on)
+                } else {
+                    stringResource(R.string.settings_accessibility_status_off)
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = if (isEnabled) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        Button(
+            onClick = onOpenAccessibilitySettings,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(R.string.settings_accessibility_open))
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.settings_accessibility_privacy_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+private fun isAccessibilityServiceEnabled(context: android.content.Context): Boolean {
+    val am = context.getSystemService(android.content.Context.ACCESSIBILITY_SERVICE) as? AccessibilityManager
+        ?: return false
+    val componentName = ComponentName(context, "com.example.deckbridge.accessibility.DeckBridgeAccessibilityService")
+    return am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+        .any { it.resolveInfo.serviceInfo.let { si -> si.packageName == componentName.packageName && si.name == componentName.className } }
 }
 
 private const val SETTINGS_ACTIVATIONS_VISIBLE = 8

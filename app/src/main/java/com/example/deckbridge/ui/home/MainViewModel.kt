@@ -1,49 +1,35 @@
-@file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-
 package com.example.deckbridge.ui.home
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.viewModelScope
 import com.example.deckbridge.data.repository.DeckBridgeRepository
 import com.example.deckbridge.domain.model.AnimatedBackgroundMode
+import com.example.deckbridge.domain.model.AnimatedBackgroundTheme
 import com.example.deckbridge.domain.model.AppState
 import com.example.deckbridge.domain.model.ButtonTriggerSource
 import com.example.deckbridge.domain.model.HostDeliveryChannel
 import com.example.deckbridge.domain.model.HostPlatform
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.SharingStarted
+import com.example.deckbridge.update.AppUpdateManager
+import com.example.deckbridge.update.UpdateState
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.transformLatest
 
 class MainViewModel(
     private val repository: DeckBridgeRepository,
+    private val updateManager: AppUpdateManager,
 ) : ViewModel() {
 
     val state: StateFlow<AppState> = repository.appState
+    val updateState: StateFlow<UpdateState> = updateManager.state
 
-    /**
-     * LAN delivery with a saved host but no successful `/health` yet — shown after a short delay to avoid flicker on resume.
-     */
-    val showLanLinkLostDialog: StateFlow<Boolean> = repository.appState
-        .map { s ->
-            s.hostDeliveryChannel == HostDeliveryChannel.LAN &&
-                s.lanServerHost.isNotBlank() &&
-                (s.lanHealthOk != true || !s.lanTrustOk)
-        }
-        .distinctUntilChanged()
-        .transformLatest { lost ->
-            if (lost) {
-                delay(1_000L)
-                emit(true)
-            } else {
-                emit(false)
-            }
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    fun onUpdateTapped(context: Context) = updateManager.startDownloadOrRequestPermission(context)
+    fun onUpdatePermissionTapped(context: Context) {
+        updateManager.openInstallPermissionSettings(context)
+    }
+    fun onInstallTapped(context: Context, uri: Uri) = updateManager.launchInstall(context, uri)
+    fun onUpdateDismissed() = updateManager.dismiss()
+    fun retryUpdateAfterPermissionGrant() = updateManager.retryAfterPermissionGrant()
 
     fun onDeckButtonTapped(buttonId: String) {
         repository.triggerDeckButton(buttonId, ButtonTriggerSource.TOUCH)
@@ -89,17 +75,40 @@ class MainViewModel(
         repository.forgetTrustedLanHostLink()
     }
 
+    fun applyLanEndpointForPlatform(platform: HostPlatform, host: String, port: Int) {
+        repository.setLanEndpointForPlatform(platform, host, port)
+    }
+
+    fun testLanHealthForPlatform(platform: HostPlatform) {
+        repository.testLanHealthForPlatform(platform)
+    }
+
+    fun forgetLanLinkForPlatform(platform: HostPlatform) {
+        repository.forgetTrustedLanHostLinkForPlatform(platform)
+    }
+
+    fun setMacSlotChannel(channel: HostDeliveryChannel) {
+        repository.setMacSlotChannel(channel)
+    }
+
     fun setAnimatedBackgroundMode(mode: AnimatedBackgroundMode) {
         repository.setAnimatedBackgroundMode(mode)
     }
 
+    fun setAnimatedBackgroundTheme(theme: AnimatedBackgroundTheme) {
+        repository.setAnimatedBackgroundTheme(theme)
+    }
+
     companion object {
-        fun factory(repository: DeckBridgeRepository): ViewModelProvider.Factory =
+        fun factory(
+            repository: DeckBridgeRepository,
+            updateManager: AppUpdateManager,
+        ): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     require(modelClass.isAssignableFrom(MainViewModel::class.java))
-                    return MainViewModel(repository) as T
+                    return MainViewModel(repository, updateManager) as T
                 }
             }
     }

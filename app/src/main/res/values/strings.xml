@@ -270,6 +270,14 @@
     <string name="home_lan_link_lost_title">PC link unavailable</string>
     <string name="home_lan_link_lost_body">DeckBridge cannot reach your saved computer over the network right now.</string>
     <string name="home_lan_link_lost_go_connect">Choose computer</string>
+    <string name="banner_no_pc_title_no_host">No computer linked</string>
+    <string name="banner_no_pc_body_no_host">Set up a PC connection to use DeckBridge</string>
+    <string name="banner_no_pc_title_trust">Link needs repair</string>
+    <string name="banner_no_pc_body_trust">Your computer link expired or changed</string>
+    <string name="banner_no_pc_title_retrying">Reconnecting…</string>
+    <string name="banner_no_pc_title_offline">PC not responding</string>
+    <string name="banner_no_pc_connect_cta">Connect</string>
+    <string name="banner_no_pc_dismiss">Dismiss connection banner</string>
 
     <string name="dash_link_ready">LAN · connected</string>
     <string name="dash_link_lan_pending">LAN · checking…</string>
@@ -290,10 +298,14 @@
     <string name="settings_logcat_hint_body">Tag: DeckBridge · Lines: [STATE] [INPUT] [MATCH] [UI] [PERF] [CAL] [KNOB] [ACTION] [HID] [LAN] [QR] [DBG] · Verbose keys: DEBUG builds only · adb logcat -s DeckBridge</string>
 
     <string name="settings_section_animated_background">Animated background</string>
-    <string name="settings_animated_bg_hint">Subtle grid pulses on the home screen. Off uses the static background only.</string>
+    <string name="settings_animated_bg_hint">Animated background on the home screen. Keeps pixels moving to prevent OLED burn-in. Off uses the static grid only.</string>
     <string name="settings_animated_bg_always">Always</string>
     <string name="settings_animated_bg_charging">Only while charging</string>
     <string name="settings_animated_bg_off">Off</string>
+    <string name="settings_animated_bg_theme_label">Style</string>
+    <string name="settings_animated_bg_theme_pulse">Grid Pulse</string>
+    <string name="settings_animated_bg_theme_particles">Particles</string>
+    <string name="settings_animated_bg_theme_aurora">Aurora</string>
 
     <string name="settings_section_session">Live hardware</string>
     <string name="settings_last_control_none">No match yet. Use the deck; lines also appear in Logcat as [MATCH].</string>
@@ -472,4 +484,45 @@
     <string name="mac_bridge_qr_hint">First time? Pair phone ↔ Mac with a QR code from the agent console (press z).</string>
     <string name="mac_bridge_scan_qr_cta">Scan Mac agent QR to pair</string>
     <string name="mac_bridge_connect_hint">Mac Bridge server is running on this phone. The Mac agent connects outbound — no firewall or IP config needed over USB cable.</string>
+
+    <!-- LAN health retry state (#4) -->
+    <string name="dash_lan_retrying">LAN · reconnecting…</string>
+
+    <!-- Action delivery failure feedback (#6) -->
+    <string name="dash_action_not_sent">Action not sent to PC</string>
+
+    <!-- Mac Bridge server running hint (#7) -->
+    <string name="mac_bridge_server_port_hint">Bridge server listening on port 8767 · waiting for Mac agent</string>
+    <string name="mac_bridge_action_dropped">⚠ Action dropped — Mac agent not polling</string>
+
+    <!-- Dual-slot routing (#dual-slot) -->
+    <string name="settings_section_windows_pc">Windows PC</string>
+    <string name="settings_section_mac">Mac</string>
+    <string name="settings_slot_not_configured">Not configured — tap to set up</string>
+    <string name="settings_slot_healthy">Connected</string>
+    <string name="settings_slot_retrying">Reconnecting…</string>
+    <string name="settings_slot_offline">Not responding</string>
+    <string name="settings_slot_trust_lost">Link expired — re-pair</string>
+    <string name="settings_mac_channel_lan">Mac via LAN</string>
+    <string name="settings_mac_channel_bridge">Mac Bridge (recommended)</string>
+    <string name="settings_mac_channel_hint">Mac Bridge: Android as server, Mac connects outbound. Works through VPN.</string>
+
+    <!-- Foreground service -->
+    <string name="service_notification_title">DeckBridge activo</string>
+    <string name="service_notification_text">Escuchando teclado en segundo plano</string>
+    <string name="service_channel_name">Estado DeckBridge</string>
+    <string name="service_channel_desc">Notificación persistente mientras DeckBridge mantiene conexiones en segundo plano.</string>
+
+    <!-- Accessibility service -->
+    <string name="accessibility_service_label">DeckBridge — teclado en segundo plano</string>
+    <string name="accessibility_service_description">Permite que DeckBridge envíe pulsaciones del teclado físico al PC aunque la app esté minimizada. No captura texto ni contraseñas; solo reenvía teclas de acceso rápido a tu computadora vinculada.</string>
+
+    <!-- Settings: background section -->
+    <string name="settings_section_background">Segundo plano</string>
+    <string name="settings_accessibility_title">Teclado en segundo plano</string>
+    <string name="settings_accessibility_desc">Con el Servicio de Accesibilidad activado, DeckBridge puede enviar atajos al PC aunque la app esté minimizada. Las conexiones LAN y Mac Bridge se mantienen activas mediante la notificación persistente.</string>
+    <string name="settings_accessibility_status_on">Activo — el teclado funciona en segundo plano</string>
+    <string name="settings_accessibility_status_off">Inactivo — solo funciona con la app en primer plano</string>
+    <string name="settings_accessibility_open">Abrir Accesibilidad del sistema</string>
+    <string name="settings_accessibility_privacy_note">Privacidad: DeckBridge no lee texto ni contraseñas. Solo reenvía teclas de acceso rápido a tu PC vinculada cuando el deck está configurado.</string>
 </resources>
