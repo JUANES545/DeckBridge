@@ -33,6 +33,7 @@ import com.example.deckbridge.R
 import com.example.deckbridge.domain.model.AppState
 import com.example.deckbridge.domain.model.HostDeliveryChannel
 import com.example.deckbridge.domain.model.HostPlatform
+import com.example.deckbridge.domain.model.PlatformSlotState
 
 @Composable
 fun DashboardTopChrome(
@@ -58,6 +59,18 @@ fun DashboardTopChrome(
             )
         }
     }
+}
+
+internal fun slotHealthDotColor(slot: PlatformSlotState): Color = when {
+    slot.channel == HostDeliveryChannel.MAC_BRIDGE && slot.macBridgeClientAlive -> Color(0xFF2EE6A0)
+    slot.channel == HostDeliveryChannel.MAC_BRIDGE && slot.macBridgeServerRunning -> Color(0xFFFFB020)
+    slot.channel == HostDeliveryChannel.MAC_BRIDGE -> Color(0xFF5A5A68)
+    slot.host.isBlank() -> Color(0xFF5A5A68)
+    !slot.trustOk -> Color(0xFFFF6B5A)
+    slot.healthOk == true -> Color(0xFF2EE6A0)
+    slot.healthRetrying -> Color(0xFFFFB020)
+    slot.healthOk == false -> Color(0xFFFF6B5A)
+    else -> Color(0xFFFFB020)
 }
 
 @Composable
@@ -90,6 +103,7 @@ fun DashboardLandscapeChrome(
                 LandscapePlatformOrb(
                     selected = effective == HostPlatform.WINDOWS,
                     onClick = { onHostPlatformSelected(HostPlatform.WINDOWS) },
+                    healthDotColor = slotHealthDotColor(state.windowsSlot),
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.ic_platform_windows),
@@ -101,6 +115,7 @@ fun DashboardLandscapeChrome(
                 LandscapePlatformOrb(
                     selected = effective == HostPlatform.MAC,
                     onClick = { onHostPlatformSelected(HostPlatform.MAC) },
+                    healthDotColor = slotHealthDotColor(state.macSlot),
                 ) {
                     Icon(
                         Icons.Outlined.LaptopMac,
@@ -127,6 +142,7 @@ fun DashboardLandscapeChrome(
 private fun LandscapePlatformOrb(
     selected: Boolean,
     onClick: () -> Unit,
+    healthDotColor: Color = Color(0xFF5A5A68),
     content: @Composable () -> Unit,
 ) {
     val shape = CircleShape
@@ -140,15 +156,25 @@ private fun LandscapePlatformOrb(
     } else {
         Color.White.copy(alpha = 0.08f)
     }
-    IconButton(
-        onClick = onClick,
-        modifier = Modifier
-            .size(44.dp)
-            .clip(shape)
-            .background(bg)
-            .border(1.dp, ring, shape),
-    ) {
-        content()
+    Box {
+        IconButton(
+            onClick = onClick,
+            modifier = Modifier
+                .size(44.dp)
+                .clip(shape)
+                .background(bg)
+                .border(1.dp, ring, shape),
+        ) {
+            content()
+        }
+        // Small health dot in bottom-right corner
+        Box(
+            modifier = Modifier
+                .size(7.dp)
+                .align(Alignment.BottomEnd)
+                .clip(CircleShape)
+                .background(healthDotColor),
+        )
     }
 }
 
@@ -184,19 +210,31 @@ private fun ConnectionStatusDot(state: AppState) {
             Color(0xFF2EE6A0) to stringResource(R.string.dash_mac_bridge_linked)
         macBridge && state.macBridgeClientAlive ->
             Color(0xFF2EE6A0) to stringResource(R.string.dash_mac_bridge_connected)
-        macBridge ->
+        macBridge && state.macBridgeServerRunning ->
             Color(0xFFFFB020) to stringResource(R.string.dash_mac_bridge_waiting)
+        macBridge ->
+            Color(0xFF5A5A68) to stringResource(R.string.dash_mac_bridge_waiting)
         !lan -> Color(0xFF5A5A68) to stringResource(R.string.dash_link_hid)
         !state.lanTrustOk -> Color(0xFFFF6B5A) to stringResource(R.string.dash_lan_trust)
         lan && hostBlank -> Color(0xFFFFB020) to stringResource(R.string.dash_lan_no_host)
         state.lanHealthOk == true -> Color(0xFF2EE6A0) to stringResource(R.string.dash_link_ready)
-        state.lanHealthOk == false -> Color(0xFFFFB020) to stringResource(R.string.dash_lan_offline)
+        // #4: distinguish "retrying" from plain "offline"
+        state.lanHealthOk == false && state.lanHealthRetrying ->
+            Color(0xFFFFB020) to stringResource(R.string.dash_lan_retrying)
+        state.lanHealthOk == false -> Color(0xFFFF6B5A) to stringResource(R.string.dash_lan_offline)
         else -> Color(0xFFFFB020) to stringResource(R.string.dash_link_lan_pending)
     }
 
     val detailLine = when {
+        // #6: action-failed feedback takes priority for 2.5 s
+        state.lastActionFailed -> stringResource(R.string.dash_action_not_sent)
+        // #2: Mac Bridge queue drop warning
+        state.macBridgeActionDropped -> stringResource(R.string.mac_bridge_action_dropped)
         macBridge && state.macBridgeClientAlive ->
             state.macBridgeClientIp ?: stringResource(R.string.dash_host_placeholder)
+        // #7: server running but no client yet — show port hint
+        macBridge && state.macBridgeServerRunning ->
+            stringResource(R.string.mac_bridge_server_port_hint)
         macBridge -> stringResource(R.string.dash_mac_bridge_waiting)
         lan && state.lanHealthOk == false && detailShort != null -> detailShort
         else -> hostLine

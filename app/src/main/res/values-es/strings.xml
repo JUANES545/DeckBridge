@@ -271,6 +271,14 @@
     <string name="home_lan_link_lost_title">Enlace con el PC no disponible</string>
     <string name="home_lan_link_lost_body">DeckBridge no puede alcanzar ahora el equipo guardado por la red.</string>
     <string name="home_lan_link_lost_go_connect">Elegir equipo</string>
+    <string name="banner_no_pc_title_no_host">Sin equipo vinculado</string>
+    <string name="banner_no_pc_body_no_host">Configura una conexión para usar DeckBridge</string>
+    <string name="banner_no_pc_title_trust">El enlace necesita reparación</string>
+    <string name="banner_no_pc_body_trust">El enlace con tu equipo expiró o cambió</string>
+    <string name="banner_no_pc_title_retrying">Reconectando…</string>
+    <string name="banner_no_pc_title_offline">El PC no responde</string>
+    <string name="banner_no_pc_connect_cta">Conectar</string>
+    <string name="banner_no_pc_dismiss">Cerrar aviso de conexión</string>
 
     <string name="dash_link_ready">LAN · conectado</string>
     <string name="dash_link_lan_pending">LAN · comprobando…</string>
@@ -291,10 +299,14 @@
     <string name="settings_logcat_hint_body">Etiqueta: DeckBridge · Líneas: [STATE] [INPUT] [MATCH] [UI] [PERF] [CAL] [KNOB] [ACTION] [HID] [LAN] [QR] [DBG] · Teclas detalladas: solo builds DEBUG · adb logcat -s DeckBridge</string>
 
     <string name="settings_section_animated_background">Fondo animado</string>
-    <string name="settings_animated_bg_hint">Pulsos sutiles en la retícula de la pantalla principal. Desactivado usa solo el fondo estático.</string>
+    <string name="settings_animated_bg_hint">Fondo animado en la pantalla principal. Mantiene los píxeles en movimiento para evitar la quemadura de pantalla OLED. Desactivado usa solo la cuadrícula estática.</string>
     <string name="settings_animated_bg_always">Siempre</string>
     <string name="settings_animated_bg_charging">Solo al cargar</string>
     <string name="settings_animated_bg_off">Desactivado</string>
+    <string name="settings_animated_bg_theme_label">Estilo</string>
+    <string name="settings_animated_bg_theme_pulse">Pulsos</string>
+    <string name="settings_animated_bg_theme_particles">Partículas</string>
+    <string name="settings_animated_bg_theme_aurora">Aurora</string>
 
     <string name="settings_section_session">Hardware en vivo</string>
     <string name="settings_last_control_none">Aún no hay coincidencias. Usa el deck; en Logcat verás [MATCH].</string>
@@ -472,4 +484,26 @@
     <string name="mac_bridge_qr_hint">¿Primera vez? Vincula teléfono ↔ Mac escaneando el QR del agente (pulsa z en la consola).</string>
     <string name="mac_bridge_scan_qr_cta">Escanear QR del agente Mac para vincular</string>
     <string name="mac_bridge_connect_hint">El servidor Mac Bridge corre en este teléfono. El agente Mac se conecta de salida — sin firewall ni IP por cable USB.</string>
+
+    <!-- Estado de reintento LAN (#4) -->
+    <string name="dash_lan_retrying">LAN · reconectando…</string>
+
+    <!-- Feedback de acción fallida (#6) -->
+    <string name="dash_action_not_sent">Acción no enviada al PC</string>
+
+    <!-- Estado del servidor Mac Bridge (#7) -->
+    <string name="mac_bridge_server_port_hint">Servidor bridge activo en puerto 8767 · esperando agente Mac</string>
+    <string name="mac_bridge_action_dropped">⚠ Acción descartada — el agente Mac no está sondeando</string>
+
+    <!-- Ruteo de dos ranuras (#dual-slot) -->
+    <string name="settings_section_windows_pc">PC Windows</string>
+    <string name="settings_section_mac">Mac</string>
+    <string name="settings_slot_not_configured">Sin configurar — toca para configurar</string>
+    <string name="settings_slot_healthy">Conectado</string>
+    <string name="settings_slot_retrying">Reconectando…</string>
+    <string name="settings_slot_offline">Sin respuesta</string>
+    <string name="settings_slot_trust_lost">Vínculo expirado — vuelve a vincular</string>
+    <string name="settings_mac_channel_lan">Mac por LAN</string>
+    <string name="settings_mac_channel_bridge">Mac Bridge (recomendado)</string>
+    <string name="settings_mac_channel_hint">Mac Bridge: Android como servidor, Mac se conecta de salida. Funciona con VPN.</string>
 </resources>

@@ -484,6 +484,8 @@ private fun MacBridgeStatusSection(app: AppState) {
     val alive = app.macBridgeClientAlive
     val paired = app.lanPersistedPairActive
     val clientIp = app.macBridgeClientIp
+    val serverRunning = app.macBridgeServerRunning
+    val actionDropped = app.macBridgeActionDropped
 
     Column(
         modifier = Modifier
@@ -493,7 +495,7 @@ private fun MacBridgeStatusSection(app: AppState) {
             .padding(horizontal = 20.dp, vertical = 20.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            MacBridgeStatusDot(alive = alive)
+            MacBridgeStatusDot(alive = alive, serverRunning = serverRunning)
             Spacer(Modifier.width(12.dp))
             Column {
                 Text(
@@ -511,12 +513,16 @@ private fun MacBridgeStatusSection(app: AppState) {
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text = when {
+                        actionDropped ->
+                            stringResource(R.string.mac_bridge_action_dropped)
                         alive && clientIp != null ->
                             stringResource(R.string.mac_bridge_client_polling, clientIp)
+                        serverRunning && !alive ->
+                            stringResource(R.string.mac_bridge_server_port_hint)
                         paired -> stringResource(R.string.mac_bridge_paired_hint)
                         else -> stringResource(R.string.mac_bridge_unpaired_hint)
                     },
-                    color = OnboardingTheme.textMuted,
+                    color = if (actionDropped) Color(0xFFFFB020) else OnboardingTheme.textMuted,
                     fontSize = 12.sp,
                 )
             }
@@ -534,32 +540,46 @@ private fun MacBridgeStatusSection(app: AppState) {
 }
 
 @Composable
-private fun MacBridgeStatusDot(alive: Boolean) {
-    if (alive) {
-        Box(
-            modifier = Modifier
-                .size(12.dp)
-                .clip(CircleShape)
-                .background(Color(0xFF2EE6A0)),
-        )
-    } else {
-        val pulse = rememberInfiniteTransition(label = "bridge_pulse")
-        val scale by pulse.animateFloat(
-            initialValue = 0.75f,
-            targetValue = 1.1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(900),
-                repeatMode = RepeatMode.Reverse,
-            ),
-            label = "bridge_dot_scale",
-        )
-        Box(
-            modifier = Modifier
-                .size(12.dp)
-                .scale(scale)
-                .clip(CircleShape)
-                .background(Color(0xFFFFB020)),
-        )
+private fun MacBridgeStatusDot(alive: Boolean, serverRunning: Boolean) {
+    when {
+        alive -> {
+            // Green: client connected
+            Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF2EE6A0)),
+            )
+        }
+        serverRunning -> {
+            // Amber pulsing: server up, waiting for Mac agent
+            val pulse = rememberInfiniteTransition(label = "bridge_pulse")
+            val scale by pulse.animateFloat(
+                initialValue = 0.75f,
+                targetValue = 1.1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(900),
+                    repeatMode = RepeatMode.Reverse,
+                ),
+                label = "bridge_dot_scale",
+            )
+            Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .scale(scale)
+                    .clip(CircleShape)
+                    .background(Color(0xFFFFB020)),
+            )
+        }
+        else -> {
+            // Grey: server not yet running
+            Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF5A5A68)),
+            )
+        }
     }
 }
 

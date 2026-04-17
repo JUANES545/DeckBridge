@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.example.deckbridge.domain.model.AnimatedBackgroundMode
+import com.example.deckbridge.domain.model.AnimatedBackgroundTheme
 import com.example.deckbridge.domain.model.HostDeliveryChannel
 import com.example.deckbridge.domain.model.HostPlatform
 import kotlinx.coroutines.flow.first
@@ -41,7 +42,8 @@ private val KEY_ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_complet
 private val KEY_SKIP_INITIAL_PC_CONNECT = booleanPreferencesKey("skip_initial_pc_connect")
 private val KEY_LAN_MOBILE_DEVICE_ID = stringPreferencesKey("lan_mobile_device_id")
 private val KEY_DECK_GRID_LAYOUT_JSON = stringPreferencesKey("deck_grid_layout_json")
-private val KEY_ANIMATED_BACKGROUND_MODE = stringPreferencesKey("animated_background_mode")
+private val KEY_ANIMATED_BACKGROUND_MODE  = stringPreferencesKey("animated_background_mode")
+private val KEY_ANIMATED_BACKGROUND_THEME = stringPreferencesKey("animated_background_theme")
 
 fun Context.deckBridgePreferences(): DataStore<Preferences> = deckBridgeDataStore
 
@@ -108,6 +110,24 @@ suspend fun DataStore<Preferences>.readHostDeliveryChannel(): HostDeliveryChanne
 suspend fun DataStore<Preferences>.writeHostDeliveryChannel(channel: HostDeliveryChannel) {
     edit { prefs ->
         prefs[KEY_HOST_DELIVERY_CHANNEL] = channel.persisted()
+    }
+}
+
+private val KEY_MAC_SLOT_CHANNEL = stringPreferencesKey("mac_slot_channel")
+
+suspend fun DataStore<Preferences>.readMacSlotChannel(): HostDeliveryChannel {
+    val raw = data.map { it[KEY_MAC_SLOT_CHANNEL] }.first()
+    // Fall back to global channel for migration (users who had MAC_BRIDGE set)
+    if (raw == null) {
+        val global = data.map { it[KEY_HOST_DELIVERY_CHANNEL] }.first()
+        return HostDeliveryChannel.fromPersisted(global)
+    }
+    return HostDeliveryChannel.fromPersisted(raw)
+}
+
+suspend fun DataStore<Preferences>.writeMacSlotChannel(channel: HostDeliveryChannel) {
+    edit { prefs ->
+        prefs[KEY_MAC_SLOT_CHANNEL] = channel.persisted()
     }
 }
 
@@ -276,5 +296,16 @@ suspend fun DataStore<Preferences>.readAnimatedBackgroundMode(): AnimatedBackgro
 suspend fun DataStore<Preferences>.writeAnimatedBackgroundMode(mode: AnimatedBackgroundMode) {
     edit { prefs ->
         prefs[KEY_ANIMATED_BACKGROUND_MODE] = mode.persisted()
+    }
+}
+
+suspend fun DataStore<Preferences>.readAnimatedBackgroundTheme(): AnimatedBackgroundTheme {
+    val raw = data.map { it[KEY_ANIMATED_BACKGROUND_THEME] }.first()
+    return AnimatedBackgroundTheme.fromPersisted(raw)
+}
+
+suspend fun DataStore<Preferences>.writeAnimatedBackgroundTheme(theme: AnimatedBackgroundTheme) {
+    edit { prefs ->
+        prefs[KEY_ANIMATED_BACKGROUND_THEME] = theme.persisted()
     }
 }

@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ipconfig getifaddr:*)",
+      "Bash(adb devices:*)",
+      "Bash(adb shell:*)",
+      "Bash(pip3 install:*)",
+      "Bash(pip3 --version)",
+      "Bash(ssh windows-pc:*)",
+      "Bash(./gradlew :app:compileDebugKotlin)",
+      "Bash(./gradlew :app:assembleDebug)",
+      "Bash(adb:*)",
+      "Bash(pkill -f \"DeckBridgeMacAgent/server.py\")",
+      "Bash(kill 80923)",
+      "Bash(pip3 show:*)",
+      "Bash(timeout 5 ./dist/DeckBridgeMacAgent/DeckBridgeMacAgent)",
+      "Bash(gtimeout 5 ./dist/DeckBridgeMacAgent/DeckBridgeMacAgent)",
+      "Bash(iconutil -c icns /Users/juamejia/Andes/DeckBridgeMacAgent/DeckBridgeMacAgent.iconset -o /Users/juamejia/Andes/DeckBridgeMacAgent/DeckBridgeMacAgent.icns)",
+      "Bash(./gradlew :app:installDebug)",
+      "Bash(jar tf:*)",
+      "Bash(jar xf:*)",
+      "Bash(.venv/bin/python3 -m PyInstaller DeckBridgeMacAgent.spec --noconfirm)",
+      "Bash(kill:*)",
+      "Bash(osascript:*)",
+      "Bash(timeout 5 ./dist/DeckBridgeMacAgent.app/Contents/MacOS/DeckBridgeMacAgent)",
+      "Bash(pkill -f DeckBridgeMacAgent)",
+      "Bash(./gradlew assembleDebug)"
+    ]
+  }
+}
