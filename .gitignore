@@ -23,3 +23,6 @@ keystore/
 
 # Local screenshots / QA captures (do not commit)
 .agent-screenshots/
+
+# Claude Code local config (never commit)
+.claude/
