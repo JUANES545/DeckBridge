@@ -1,38 +1,35 @@
 package com.example.deckbridge
 
-import android.content.BroadcastReceiver
+import android.Manifest
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.MotionEvent
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.rememberNavController
-import com.example.deckbridge.host.HostOsDetector
 import com.example.deckbridge.service.DeckBridgeService
 import com.example.deckbridge.ui.navigation.DeckBridgeDestinations
 import com.example.deckbridge.ui.navigation.DeckBridgeNavHost
 import com.example.deckbridge.ui.onboarding.OnboardingFlow
-import com.example.deckbridge.ui.onboarding.OnboardingTheme
 import com.example.deckbridge.logging.SessionFileLog
 import com.example.deckbridge.ui.splash.BrandedSplashScreen
 import com.example.deckbridge.ui.theme.DeckBridgeTheme
@@ -40,44 +37,41 @@ import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
 
-    private val usbStateReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            appRepository().refreshHostAndTransport()
-        }
-    }
+    private lateinit var requestBtConnect: ActivityResultLauncher<String>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Once BLUETOOTH_CONNECT is granted, re-read the keyboard battery level immediately.
+        requestBtConnect = registerForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { granted ->
+            if (granted) appRepository().refreshAttachedKeyboards()
+        }
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         enableEdgeToEdge()
         setContent {
             DeckBridgeTheme {
-                var showSplash by remember { mutableStateOf(true) }
+                val repo = appRepository()
+                val onboardingGate by repo.onboardingComplete.collectAsStateWithLifecycle(initialValue = null)
+                // Show splash until data is ready, but at least SPLASH_MIN_MS so the
+                // animation has time to render. As soon as both conditions are met
+                // (min time elapsed AND onboardingGate is not null) we fade out.
+                var minElapsed by remember { mutableStateOf(false) }
                 LaunchedEffect(Unit) {
-                    delay(2_600)
-                    showSplash = false
+                    delay(700)
+                    minElapsed = true
                 }
+                val showSplash = !minElapsed || onboardingGate == null
                 Crossfade(
                     targetState = showSplash,
                     modifier = Modifier.fillMaxSize(),
-                    animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing),
+                    animationSpec = tween(durationMillis = 320, easing = FastOutSlowInEasing),
                     label = "deckbridge_splash",
                 ) { splash ->
                     if (splash) {
                         BrandedSplashScreen(Modifier.fillMaxSize())
                     } else {
-                        val repo = appRepository()
-                        val onboardingGate by repo.onboardingComplete.collectAsStateWithLifecycle(initialValue = null)
                         when (onboardingGate) {
-                            null -> {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(OnboardingTheme.background),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    CircularProgressIndicator(color = OnboardingTheme.accent)
-                                }
-                            }
                             false -> {
                                 OnboardingFlow(
                                     onFinished = { repo.markOnboardingFinished() },
@@ -107,24 +101,18 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         // Stop background service — app is visible again.
         DeckBridgeService.stop(this)
-        val filter = IntentFilter(HostOsDetector.USB_STATE_INTENT_ACTION)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(usbStateReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            @Suppress("DEPRECATION")
-            registerReceiver(usbStateReceiver, filter)
-        }
         appRepository().refreshAttachedKeyboards()
-        appRepository().refreshHostAndTransport()
         appRepository().refreshLanDiscoveryOnForeground()
+        // BLUETOOTH_CONNECT is needed on API 31+ for keyboard battery level and keep-alive pings.
+        // Request it proactively so the feature works without any extra UI step.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestBtConnect.launch(Manifest.permission.BLUETOOTH_CONNECT)
+        }
     }
 
     override fun onPause() {
-        try {
-            unregisterReceiver(usbStateReceiver)
-        } catch (_: IllegalArgumentException) {
-            // Not registered
-        }
         super.onPause()
     }
 

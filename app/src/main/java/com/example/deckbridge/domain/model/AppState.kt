@@ -8,6 +8,7 @@ import com.example.deckbridge.domain.hardware.KnobMirrorRotationAccum
 import com.example.deckbridge.domain.hardware.RawDiagnosticLine
 import com.example.deckbridge.profiles.Profile
 
+
 /**
  * Coherent snapshot of what the home surface needs. Mirrors domain concepts without UI types.
  *
@@ -22,7 +23,7 @@ data class AppState(
     /** Short explanation for Settings (detection result or manual hint). */
     val hostDetectionDetail: String,
     val physicalKeyboard: PhysicalKeyboardStatus,
-    val hostConnection: HostConnectionStatus,
+
     val activeProfile: Profile,
     val macroButtons: List<MacroButton>,
     /** Persisted knob row (CCW / CW / press actions); labels feed the mirror UI. */
@@ -45,11 +46,6 @@ data class AppState(
     val hardwareDiagSummary: HardwareDiagSummary?,
     /** Raw KEY/MOTION lines for deep debugging (capped in repository). */
     val rawInputDiagnostics: List<RawDiagnosticLine>,
-    /** USB gadget HID transport (keyboard / consumer). */
-    val hidTransport: HidTransportUiState,
-    val hidPcModeEnabled: Boolean,
-    val privilegedShellAvailable: Boolean,
-    val hidDebugLine: String,
     /** Subtle animated grid background on the home dashboard (persisted). */
     val animatedBackgroundMode: AnimatedBackgroundMode,
     val animatedBackgroundTheme: AnimatedBackgroundTheme = AnimatedBackgroundTheme.GRID_PULSE,
@@ -61,6 +57,8 @@ data class AppState(
     val windowsSlot: PlatformSlotState = PlatformSlotState(channel = HostDeliveryChannel.LAN),
     /** Mac slot connection state (LAN or Mac Bridge). */
     val macSlot: PlatformSlotState = PlatformSlotState(channel = HostDeliveryChannel.MAC_BRIDGE),
+    /** When true the repository maintains a GATT keep-alive ping to prevent the BT keyboard from sleeping. */
+    val keepKeyboardAwake: Boolean = false,
 ) {
     // ── Active slot ──────────────────────────────────────────────────────────
     val activeSlot: PlatformSlotState get() = when (hostPlatform.coerceForDeckData()) {

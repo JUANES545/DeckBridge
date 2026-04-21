@@ -9,10 +9,9 @@ import java.util.concurrent.atomic.AtomicReference
 /**
  * Routes [dispatch] calls to the correct transport based on the active slot and its channel.
  *
- * - Windows slot → always [winLan]
- * - Mac slot, channel=LAN → [macLan]
- * - Mac slot, channel=MAC_BRIDGE → [mac]
- * - Any slot, USB_HID override → [hid]
+ * - Windows slot → always LAN
+ * - Mac slot, channel=LAN → macLan
+ * - Mac slot, channel=MAC_BRIDGE → mac
  *
  * Both [channel] and [activeLan] are held in a single [AtomicReference] to a [DispatchTarget]
  * snapshot, so [dispatch] always reads a consistent pair — no TOCTOU race between reading the
@@ -21,7 +20,6 @@ import java.util.concurrent.atomic.AtomicReference
 class HostDeliveryRouter(
     initialChannel: AtomicReference<HostDeliveryChannel>,
     initialLan: AtomicReference<LanTransportDispatcher>,
-    private val hid: HidTransportDispatcher,
     private val mac: MacBridgeDispatcher,
 ) : ActionDispatcher {
 
@@ -48,7 +46,6 @@ class HostDeliveryRouter(
         val snap = target.get()   // single atomic read — channel + lan are always consistent
         return when (snap.channel) {
             HostDeliveryChannel.LAN        -> snap.lan.dispatch(resolved)
-            HostDeliveryChannel.USB_HID    -> hid.dispatch(resolved)
             HostDeliveryChannel.MAC_BRIDGE -> mac.dispatch(resolved)
         }
     }

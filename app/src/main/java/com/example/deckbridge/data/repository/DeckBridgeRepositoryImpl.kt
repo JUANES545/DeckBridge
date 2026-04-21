@@ -1,7 +1,10 @@
 package com.example.deckbridge.data.repository
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.hardware.input.InputManager
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -13,7 +16,6 @@ import androidx.datastore.preferences.core.Preferences
 import com.example.deckbridge.R
 import com.example.deckbridge.actions.ActionDispatcher
 import com.example.deckbridge.actions.HostDeliveryRouter
-import com.example.deckbridge.actions.HidTransportDispatcher
 import com.example.deckbridge.data.deck.DeckCatalog
 import com.example.deckbridge.data.deck.DeckGridDisplay
 import com.example.deckbridge.data.deck.DeckGridLayoutJson
@@ -26,11 +28,12 @@ import com.example.deckbridge.data.deck.DeckKnobPreset
 import com.example.deckbridge.data.hardware.HardwareBridge
 import com.example.deckbridge.data.hardware.HardwareCalibrationJson
 import com.example.deckbridge.data.mock.MockAppStateFactory
+import com.example.deckbridge.data.preferences.readKeepKeyboardAwake
+import com.example.deckbridge.data.preferences.writeKeepKeyboardAwake
 import com.example.deckbridge.data.preferences.readAnimatedBackgroundMode
 import com.example.deckbridge.data.preferences.readAnimatedBackgroundTheme
 import com.example.deckbridge.data.preferences.readDeckGridLayoutJson
 import com.example.deckbridge.data.preferences.readHardwareCalibrationJson
-import com.example.deckbridge.data.preferences.readHidPcModeOrNull
 import com.example.deckbridge.data.preferences.readHostAutoDetect
 import com.example.deckbridge.data.preferences.readHostDeliveryChannel
 import com.example.deckbridge.data.preferences.readMacSlotChannel
@@ -46,7 +49,6 @@ import com.example.deckbridge.data.preferences.writeAnimatedBackgroundMode
 import com.example.deckbridge.data.preferences.writeAnimatedBackgroundTheme
 import com.example.deckbridge.data.preferences.writeDeckGridLayoutJson
 import com.example.deckbridge.data.preferences.writeHardwareCalibrationJson
-import com.example.deckbridge.data.preferences.writeHidPcMode
 import com.example.deckbridge.data.preferences.writeHostAutoDetect
 import com.example.deckbridge.data.preferences.writeHostDeliveryChannel
 import com.example.deckbridge.data.preferences.writeMacSlotChannel
@@ -79,13 +81,11 @@ import com.example.deckbridge.domain.model.PlatformSlotState
 import com.example.deckbridge.domain.model.DECK_HIGHLIGHT_DURATION_MS
 import com.example.deckbridge.domain.model.DeckActivationLogEntry
 import com.example.deckbridge.domain.model.DeckButtonHighlight
-import com.example.deckbridge.domain.model.HostConnectionStatus
 import com.example.deckbridge.domain.model.HostDeliveryChannel
 import com.example.deckbridge.domain.model.HostPlatform
 import com.example.deckbridge.domain.model.HostPlatformSource
 import com.example.deckbridge.domain.model.LanAgentListScanState
 import com.example.deckbridge.domain.model.LanDiscoveredAgent
-import com.example.deckbridge.domain.model.HostUsbConnectionState
 import com.example.deckbridge.domain.model.InputDeviceSnapshot
 import com.example.deckbridge.domain.model.KeyboardInputClassification
 import com.example.deckbridge.domain.model.PhysicalKeyboardConnectionState
@@ -95,8 +95,6 @@ import com.example.deckbridge.input.InputDeviceSnapshotFactory
 import com.example.deckbridge.input.KeyboardCaptureRules
 import com.example.deckbridge.input.KeyboardKeyFormatter
 import com.example.deckbridge.device.EmulatorDetector
-import com.example.deckbridge.device.PrivilegedShellProbe
-import com.example.deckbridge.hid.HidGadgetSession
 import com.example.deckbridge.host.HostOsDetector
 import com.example.deckbridge.mac.MacBridgeServer
 import com.example.deckbridge.lan.LanAgentProbeSnapshot
@@ -108,13 +106,12 @@ import com.example.deckbridge.lan.LanHostClient
 import com.example.deckbridge.lan.LanPairingSessionCreated
 import com.example.deckbridge.lan.LanPairingSessionStatus
 import com.example.deckbridge.logging.DeckBridgeLog
-import com.example.deckbridge.transport.HidDebugLineFormatter
-import com.example.deckbridge.transport.HidTransportUiMapper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -160,8 +157,6 @@ class DeckBridgeRepositoryImpl(
     private val macLanDispatcher: LanTransportDispatcher,
     private val winCircuitBreaker: LanCircuitBreaker,
     private val macCircuitBreaker: LanCircuitBreaker,
-    private val hidTransportDispatcher: HidTransportDispatcher,
-    private val hidGadgetSession: HidGadgetSession,
     private val macBridgeServer: MacBridgeServer,
     private val dataStore: DataStore<Preferences>,
 ) : DeckBridgeRepository {
@@ -182,7 +177,8 @@ class DeckBridgeRepositoryImpl(
 
     private val _onboardingComplete = MutableStateFlow<Boolean?>(null)
 
-    private val _skipInitialPcConnect = MutableStateFlow<Boolean?>(null)
+    // Session-only: always starts as false so the connect gate shows on every launch when offline.
+    private val _skipInitialPcConnect = MutableStateFlow<Boolean?>(false)
 
     private val pendingOpenPcConnect = AtomicBoolean(false)
 
@@ -198,6 +194,9 @@ class DeckBridgeRepositoryImpl(
     private var hostTransportRefreshJob: Job? = null
     private var lanForegroundDiscoveryJob: Job? = null
     private var macBridgeStateJob: Job? = null
+    private var keyboardBatteryJob: Job? = null
+    private var keepKeyboardAliveJob: Job? = null
+    @Volatile private var keepAliveGatt: android.bluetooth.BluetoothGatt? = null
     private var winHealthRetryJob: Job? = null
     private var macHealthRetryJob: Job? = null
     private var actionFailedClearJob: Job? = null
@@ -245,7 +244,7 @@ class DeckBridgeRepositoryImpl(
         }
 
         externalScope.launch {
-            _skipInitialPcConnect.value = dataStore.migrateAndReadSkipInitialPcConnect()
+            dataStore.migrateAndReadSkipInitialPcConnect() // run migration side-effect only; skip resets each session
         }
 
         externalScope.launch {
@@ -256,7 +255,6 @@ class DeckBridgeRepositoryImpl(
                     s.lanHealthOk == true &&
                     s.lanTrustOk
                 ) {
-                    dataStore.writeSkipInitialPcConnect(true)
                     _skipInitialPcConnect.value = true
                     DeckBridgeLog.state("skip initial PC connect (LAN health OK + trust OK)")
                 }
@@ -268,27 +266,12 @@ class DeckBridgeRepositoryImpl(
             // Previously done via runBlocking() on the calling thread (ANR risk on slow storage).
             val surface = withContext(Dispatchers.IO) { loadPersistedSurfaceOrSeed() }
             applyPersistedSurfaceToAppState(surface)
-            bootstrapHidPcMode()
             bootstrapLanSettings()
             bootstrapAnimatedBackground()
             attemptLanUdpDiscoveryAndHealth()
             scheduleHostAndTransportRefresh()
         }
 
-        // USB cable watchdog — reacts immediately when the cable is removed instead of
-        // waiting for the next onResume / manual refresh cycle.
-        externalScope.launch {
-            var prevUsbState: HostUsbConnectionState? = null
-            _appState.collect { state ->
-                val current = state.hostConnection.usbState
-                if (prevUsbState == HostUsbConnectionState.READY
-                    && current == HostUsbConnectionState.NOT_CONNECTED
-                ) {
-                    autoFallbackOnUsbDrop(state)
-                }
-                prevUsbState = current
-            }
-        }
         externalScope.launch {
             val json = dataStore.readHardwareCalibrationJson()
             val cfg = HardwareCalibrationJson.decode(json)
@@ -302,6 +285,32 @@ class DeckBridgeRepositoryImpl(
                 DeckBridgeLog.state("no saved calibration")
             }
         }
+        startKeyboardBatteryPolling()
+        externalScope.launch {
+            val keepAwake = dataStore.readKeepKeyboardAwake()
+            if (keepAwake) {
+                _appState.update { it.copy(keepKeyboardAwake = true) }
+                maybeStartKeepAlive()
+            }
+        }
+        externalScope.launch {
+            _appState.collect { s ->
+                if (s.keepKeyboardAwake &&
+                    s.physicalKeyboard.state == PhysicalKeyboardConnectionState.CONNECTED
+                ) {
+                    maybeStartKeepAlive()
+                } else if (!s.keepKeyboardAwake ||
+                    s.physicalKeyboard.state != PhysicalKeyboardConnectionState.CONNECTED
+                ) {
+                    if (keepKeyboardAliveJob?.isActive == true &&
+                        !s.keepKeyboardAwake
+                    ) stopKeepAlive()
+                }
+            }
+        }
+        // Scan for already-connected keyboards at startup (hot-plug events are not fired for
+        // devices that were connected before the app started).
+        scheduleDebouncedKeyboardRefresh()
     }
 
     private fun scheduleDebouncedKeyboardRefresh() {
@@ -309,46 +318,6 @@ class DeckBridgeRepositoryImpl(
         deviceRefreshJob = externalScope.launch {
             delay(DEVICE_REFRESH_DEBOUNCE_MS)
             refreshAttachedKeyboards()
-        }
-    }
-
-    /**
-     * Called by the USB watchdog when the cable transitions READY → NOT_CONNECTED.
-     *
-     * Strategy per active channel:
-     * - **MAC_BRIDGE**: server keeps running; Mac agent must reconnect via the phone's WiFi IP
-     *   (same path it would use without a cable). State polling is restarted to surface
-     *   the reconnect status in the UI promptly.
-     * - **LAN**: WiFi is likely still reachable — fire an immediate health probe without
-     *   waiting for the next scheduled refresh (debounce window is up to 800 ms).
-     * - Regardless of channel, [scheduleHostAndTransportRefresh] is called so the
-     *   platform detection and HID state are re-evaluated with the cable gone.
-     */
-    private fun autoFallbackOnUsbDrop(state: AppState) {
-        val platform = state.hostPlatform.normalizeForLanPersistence()
-        val channel  = state.hostDeliveryChannel
-        DeckBridgeLog.state(
-            "connection-watchdog: USB cable dropped · slot=$platform · channel=$channel · " +
-                "macBridgeRunning=${macBridgeServer.isRunning} · macBridgeAlive=${macBridgeServer.isClientAlive()}"
-        )
-        // Always re-evaluate platform + HID state (detects USB gone, may change auto-detected OS).
-        scheduleHostAndTransportRefresh()
-        when (channel) {
-            HostDeliveryChannel.MAC_BRIDGE -> {
-                // Mac Bridge server stays alive — Mac agent reconnects via WiFi automatically.
-                // Restart polling so the UI reflects the client-alive / client-dropped transition.
-                startMacBridgeStatePolling()
-                DeckBridgeLog.state(
-                    "connection-watchdog: MAC_BRIDGE server running · " +
-                        "Mac agent should reconnect via phone WiFi IP"
-                )
-            }
-            HostDeliveryChannel.LAN -> {
-                // WiFi may still be reachable without the cable — probe immediately.
-                externalScope.launch { runLanHealthProbeForPlatform(platform) }
-                DeckBridgeLog.state("connection-watchdog: LAN re-probe triggered after USB drop")
-            }
-            else -> Unit   // USB_HID or any future channel: scheduleHostAndTransportRefresh handles it
         }
     }
 
@@ -378,11 +347,8 @@ class DeckBridgeRepositoryImpl(
     }.stateIn(externalScope, SharingStarted.Eagerly, false)
 
     override fun markSkipInitialPcConnect(skip: Boolean) {
-        externalScope.launch {
-            dataStore.writeSkipInitialPcConnect(skip)
-            _skipInitialPcConnect.value = skip
-            DeckBridgeLog.state("skip initial PC connect set=$skip")
-        }
+        _skipInitialPcConnect.value = skip
+        DeckBridgeLog.state("skip initial PC connect set=$skip (session only)")
     }
 
     override fun markOnboardingFinished() {
@@ -844,32 +810,12 @@ class DeckBridgeRepositoryImpl(
         }
     }
 
-    override fun refreshHostAndTransport() {
-        scheduleHostAndTransportRefresh()
-    }
-
-    /** Coalesces init + onResume + USB_STATE bursts into one probe (same result, less Logcat noise). */
+    /** Coalesces init + onResume bursts into one probe (same result, less Logcat noise). */
     private fun scheduleHostAndTransportRefresh() {
         hostTransportRefreshJob?.cancel()
         hostTransportRefreshJob = externalScope.launch {
             delay(HOST_TRANSPORT_DEBOUNCE_MS)
             refreshHostAndTransportInternal()
-        }
-    }
-
-    private suspend fun bootstrapHidPcMode() {
-        val root = PrivilegedShellProbe.isAvailable()
-        val existing = dataStore.readHidPcModeOrNull()
-        val mode = existing ?: root
-        if (existing == null) {
-            dataStore.writeHidPcMode(mode)
-        }
-        hidTransportDispatcher.setHidPcModeEnabled(mode)
-        _appState.update { prev ->
-            prev.copy(
-                privilegedShellAvailable = root,
-                hidPcModeEnabled = mode,
-            )
         }
     }
 
@@ -896,21 +842,41 @@ class DeckBridgeRepositoryImpl(
         }
     }
 
+    override fun setKeepKeyboardAwake(enabled: Boolean) {
+        externalScope.launch(Dispatchers.IO) {
+            dataStore.writeKeepKeyboardAwake(enabled)
+        }
+        _appState.update { it.copy(keepKeyboardAwake = enabled) }
+        DeckBridgeLog.state("keepKeyboardAwake=$enabled")
+        if (enabled) maybeStartKeepAlive() else stopKeepAlive()
+    }
+
     private fun startMacBridgeStatePolling() {
         if (macBridgeStateJob?.isActive == true) return
         macBridgeStateJob = externalScope.launch {
+            var prevAlive = false
             while (true) {
                 val alive = macBridgeServer.isClientAlive()
                 val ip = macBridgeServer.peekClientIp()
                 val serverRunning = macBridgeServer.isRunning
                 val dropped = macBridgeServer.peekAndResetDropCount()
+                val localIp = macBridgeServer.localWifiIp()
                 _appState.updateMacSlot {
                     copy(
                         macBridgeClientAlive = alive,
                         macBridgeClientIp = if (alive) ip else null,
                         macBridgeServerRunning = serverRunning,
+                        macBridgeServerLocalIp = localIp,
                     )
                 }
+                // When the Mac bridge client connects (false→true) and the delivery channel is
+                // still LAN (persisted from an older setup), auto-switch to MAC_BRIDGE so actions
+                // are routed through the bridge queue instead of failing via the old LAN path.
+                if (alive && !prevAlive && _appState.value.macSlot.channel != HostDeliveryChannel.MAC_BRIDGE) {
+                    DeckBridgeLog.lan("MacBridge: client connected — auto-switching delivery to MAC_BRIDGE")
+                    setHostDeliveryChannel(HostDeliveryChannel.MAC_BRIDGE, skipLanDiscovery = true)
+                }
+                prevAlive = alive
                 if (dropped > 0) {
                     DeckBridgeLog.lan("MacBridge: $dropped action(s) dropped (queue full — Mac agent not polling fast enough)")
                     _appState.updateMacSlot { copy(macBridgeActionDropped = true) }
@@ -930,7 +896,180 @@ class DeckBridgeRepositoryImpl(
         macBridgeStateJob = null
         macBridgeDropClearJob?.cancel()
         macBridgeDropClearJob = null
-        _appState.updateMacSlot { copy(macBridgeServerRunning = false, macBridgeActionDropped = false) }
+        _appState.updateMacSlot {
+            copy(
+                macBridgeServerRunning = false,
+                macBridgeActionDropped = false,
+                macBridgeClientAlive = false,
+                macBridgeClientIp = null,
+            )
+        }
+    }
+
+    private fun maybeStartKeepAlive() {
+        if (keepKeyboardAliveJob?.isActive == true) return
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        if (app.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)
+            != PackageManager.PERMISSION_GRANTED) return
+        if (_appState.value.physicalKeyboard.state != PhysicalKeyboardConnectionState.CONNECTED) return
+        startKeepAlive()
+    }
+
+    /**
+     * Opens a dedicated GATT connection to the keyboard, requests CONNECTION_PRIORITY_HIGH,
+     * then reads the Battery Level characteristic every [KEEP_ALIVE_PING_INTERVAL_MS] to
+     * generate BLE traffic that resets the keyboard's inactivity timer.
+     *
+     * This is best-effort: if the keyboard firmware only reacts to HID reports this won't help.
+     */
+    @Suppress("DiscouragedPrivateApi", "UNCHECKED_CAST")
+    private fun startKeepAlive() {
+        keepKeyboardAliveJob = externalScope.launch {
+            DeckBridgeLog.state("keepAlive: starting GATT keep-alive loop")
+            while (isActive && _appState.value.keepKeyboardAwake) {
+                val device = findConnectedKeyboardBtDevice()
+                if (device == null) {
+                    DeckBridgeLog.state("keepAlive: no BT keyboard found, retrying in 10s")
+                    delay(10_000)
+                    continue
+                }
+                val connected = kotlinx.coroutines.CompletableDeferred<Boolean>()
+                var battChar: android.bluetooth.BluetoothGattCharacteristic? = null
+
+                val callback = object : android.bluetooth.BluetoothGattCallback() {
+                    override fun onConnectionStateChange(
+                        gatt: android.bluetooth.BluetoothGatt,
+                        status: Int,
+                        newState: Int,
+                    ) {
+                        when (newState) {
+                            android.bluetooth.BluetoothProfile.STATE_CONNECTED -> {
+                                DeckBridgeLog.state("keepAlive: GATT connected, requesting HIGH priority")
+                                gatt.requestConnectionPriority(android.bluetooth.BluetoothGatt.CONNECTION_PRIORITY_HIGH)
+                                gatt.discoverServices()
+                            }
+                            android.bluetooth.BluetoothProfile.STATE_DISCONNECTED -> {
+                                DeckBridgeLog.state("keepAlive: GATT disconnected")
+                                connected.complete(false)
+                            }
+                        }
+                    }
+
+                    override fun onServicesDiscovered(gatt: android.bluetooth.BluetoothGatt, status: Int) {
+                        val svc = gatt.getService(BATTERY_SERVICE_UUID)
+                        battChar = svc?.getCharacteristic(BATTERY_LEVEL_CHAR_UUID)
+                        DeckBridgeLog.state("keepAlive: services discovered battChar=${battChar != null}")
+                        connected.complete(battChar != null)
+                    }
+
+                    override fun onCharacteristicRead(
+                        gatt: android.bluetooth.BluetoothGatt,
+                        characteristic: android.bluetooth.BluetoothGattCharacteristic,
+                        value: ByteArray,
+                        status: Int,
+                    ) {
+                        if (status == android.bluetooth.BluetoothGatt.GATT_SUCCESS && value.isNotEmpty()) {
+                            val lvl = value[0].toInt() and 0xFF
+                            DeckBridgeLog.state("keepAlive: ping ok battery=$lvl%")
+                            _appState.update { it.copy(physicalKeyboard = it.physicalKeyboard.copy(batteryLevel = lvl)) }
+                        }
+                    }
+
+                    @Deprecated("Deprecated in Java", ReplaceWith(""))
+                    override fun onCharacteristicRead(
+                        gatt: android.bluetooth.BluetoothGatt,
+                        characteristic: android.bluetooth.BluetoothGattCharacteristic,
+                        status: Int,
+                    ) {
+                        val value = characteristic.value ?: return
+                        if (status == android.bluetooth.BluetoothGatt.GATT_SUCCESS && value.isNotEmpty()) {
+                            val lvl = value[0].toInt() and 0xFF
+                            DeckBridgeLog.state("keepAlive: ping ok battery=$lvl% (compat)")
+                            _appState.update { it.copy(physicalKeyboard = it.physicalKeyboard.copy(batteryLevel = lvl)) }
+                        }
+                    }
+                }
+
+                val gatt = device.connectGatt(app, false, callback, android.bluetooth.BluetoothDevice.TRANSPORT_LE)
+                keepAliveGatt = gatt
+
+                val success = kotlinx.coroutines.withTimeoutOrNull(15_000) { connected.await() } ?: false
+                if (!success) {
+                    DeckBridgeLog.state("keepAlive: GATT connect failed/timeout, retrying in 15s")
+                    gatt.close()
+                    keepAliveGatt = null
+                    delay(15_000)
+                    continue
+                }
+
+                // Ping loop: read battery characteristic periodically
+                while (isActive && _appState.value.keepKeyboardAwake &&
+                    _appState.value.physicalKeyboard.state == PhysicalKeyboardConnectionState.CONNECTED
+                ) {
+                    delay(KEEP_ALIVE_PING_INTERVAL_MS)
+                    battChar?.let {
+                        DeckBridgeLog.state("keepAlive: sending ping read")
+                        gatt.readCharacteristic(it)
+                    }
+                }
+
+                DeckBridgeLog.state("keepAlive: exiting ping loop, disconnecting GATT")
+                gatt.disconnect()
+                delay(500)
+                gatt.close()
+                keepAliveGatt = null
+                break
+            }
+            DeckBridgeLog.state("keepAlive: job ended")
+        }
+    }
+
+    private fun stopKeepAlive() {
+        DeckBridgeLog.state("keepAlive: stopping")
+        keepKeyboardAliveJob?.cancel()
+        keepKeyboardAliveJob = null
+        keepAliveGatt?.let {
+            try { it.disconnect() } catch (_: Exception) {}
+            try { it.close() } catch (_: Exception) {}
+        }
+        keepAliveGatt = null
+    }
+
+    @Suppress("DiscouragedPrivateApi", "UNCHECKED_CAST")
+    private fun findConnectedKeyboardBtDevice(): android.bluetooth.BluetoothDevice? {
+        return try {
+            val adapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter() ?: return null
+            val getBonded = adapter.javaClass.getMethod("getBondedDevices")
+            val bonded = (getBonded.invoke(adapter) as? Set<android.bluetooth.BluetoothDevice>) ?: return null
+            val getBatteryLevel = android.bluetooth.BluetoothDevice::class.java.getMethod("getBatteryLevel")
+            // Return the first bonded device with a known (≥0) battery level — the keyboard
+            bonded.firstOrNull { d ->
+                val lvl = try { getBatteryLevel.invoke(d) as? Int ?: -1 } catch (_: Exception) { -1 }
+                lvl >= 0
+            }
+        } catch (e: Exception) {
+            DeckBridgeLog.state("findConnectedKeyboardBtDevice failed: ${e.message}")
+            null
+        }
+    }
+
+    /** Periodically refreshes the keyboard battery level (~every 60 s) while the app is active. */
+    private fun startKeyboardBatteryPolling() {
+        if (keyboardBatteryJob?.isActive == true) return
+        keyboardBatteryJob = externalScope.launch {
+            while (true) {
+                delay(60_000L)
+                val keyboard = _appState.value.physicalKeyboard
+                if (keyboard.state == PhysicalKeyboardConnectionState.CONNECTED) {
+                    val detected = scanExternalKeyboards()
+                    val first = detected.firstOrNull() ?: continue
+                    val newLevel = readInputDeviceBatteryLevel(first.deviceId)
+                    if (newLevel != keyboard.batteryLevel) {
+                        _appState.update { it.copy(physicalKeyboard = it.physicalKeyboard.copy(batteryLevel = newLevel)) }
+                    }
+                }
+            }
+        }
     }
 
     private fun lanPlatformForEndpoints(): HostPlatform =
@@ -1014,13 +1153,13 @@ class DeckBridgeRepositoryImpl(
         hostDeliveryRouter.setActiveChannel(activeSlot.channel)
         val activePlatform = _appState.value.hostPlatform.normalizeForLanPersistence()
         hostDeliveryRouter.setActiveLanDispatcher(dispatcherForPlatform(activePlatform))
-        // Start Mac Bridge if Mac slot uses it
-        if (macChannel == HostDeliveryChannel.MAC_BRIDGE) {
-            val tok = dataStore.readLanPairTokenForPlatform(HostPlatform.MAC).trim().takeIf { it.isNotEmpty() }
-            macBridgeServer.setPairToken(tok)
-            macBridgeServer.start(externalScope)
-            startMacBridgeStatePolling()
-        }
+        // Always start the MacBridgeServer so the Mac agent can connect via ADB forward
+        // even when the Mac slot channel is LAN. The server is lightweight and the router
+        // only dispatches actions through the configured channel.
+        val tok = dataStore.readLanPairTokenForPlatform(HostPlatform.MAC).trim().takeIf { it.isNotEmpty() }
+        macBridgeServer.setPairToken(tok)
+        macBridgeServer.start(externalScope)
+        startMacBridgeStatePolling()
         DeckBridgeLog.state(
             "LAN bootstrap macChannel=$macChannel activePlatform=$activePlatform " +
                 "winHost=${_appState.value.windowsSlot.host.ifBlank { "—" }} " +
@@ -1201,27 +1340,12 @@ class DeckBridgeRepositoryImpl(
                 HostPlatform.MAC -> macHealthRetryJob = null
                 else -> winHealthRetryJob = null
             }
-            // Mac slot exhausted all LAN retries: if MAC_BRIDGE is still running
-            // (cable was providing ADB tunnel and is now gone), the server is already
-            // waiting — nothing to do.  If MAC_BRIDGE is NOT running but was previously
-            // the configured channel for the Mac slot, auto-activate it so the Mac agent
-            // can reconnect via WiFi.
             if (p == HostPlatform.MAC) {
-                val snap = _appState.value
-                val macBridgeWasPreferred = snap.macSlot.channel == HostDeliveryChannel.MAC_BRIDGE
-                    || macBridgeServer.isRunning
-                if (macBridgeWasPreferred && !macBridgeServer.isRunning) {
-                    DeckBridgeLog.state(
-                        "connection-watchdog: LAN retries exhausted on Mac slot · " +
-                            "MAC_BRIDGE was preferred — activating server for WiFi reconnect"
-                    )
-                    setHostDeliveryChannel(HostDeliveryChannel.MAC_BRIDGE)
-                } else if (macBridgeServer.isRunning) {
-                    DeckBridgeLog.state(
-                        "connection-watchdog: LAN retries exhausted on Mac slot · " +
-                            "MAC_BRIDGE server already running — Mac agent can reconnect via WiFi"
-                    )
-                }
+                // MacBridgeServer is always running — Mac agent will auto-reconnect.
+                DeckBridgeLog.state(
+                    "connection-watchdog: LAN retries exhausted on Mac slot · " +
+                        "MacBridgeServer running=${macBridgeServer.isRunning} — Mac agent can reconnect via ADB/WiFi"
+                )
             }
         }
         when (p) {
@@ -1241,15 +1365,13 @@ class DeckBridgeRepositoryImpl(
 
     override fun setHostDeliveryChannel(channel: HostDeliveryChannel, skipLanDiscovery: Boolean) {
         externalScope.launch {
-            // Channel selection is per Mac slot (Windows is always LAN; HID is global)
+            // Channel selection is per Mac slot (Windows is always LAN)
             val activePlatform = lanPlatformForEndpoints()
-            if (activePlatform == HostPlatform.MAC || channel == HostDeliveryChannel.USB_HID) {
+            if (activePlatform == HostPlatform.MAC) {
                 dataStore.writeHostDeliveryChannel(channel)
             }
-            if (channel != HostDeliveryChannel.USB_HID) {
-                dataStore.writeMacSlotChannel(channel)
-                _appState.updateMacSlot { copy(channel = channel) }
-            }
+            dataStore.writeMacSlotChannel(channel)
+            _appState.updateMacSlot { copy(channel = channel) }
             hostDeliveryRouter.setActiveChannel(_appState.value.activeSlot.channel)
             DeckBridgeLog.state("hostDeliveryChannel=$channel slot=$activePlatform")
             if (channel == HostDeliveryChannel.MAC_BRIDGE) {
@@ -1260,9 +1382,15 @@ class DeckBridgeRepositoryImpl(
                 }
                 startMacBridgeStatePolling()
             } else {
-                stopMacBridgeStatePolling()
-                if (macBridgeServer.isRunning) macBridgeServer.stop()
-                if (channel == HostDeliveryChannel.LAN && !skipLanDiscovery && activePlatform == HostPlatform.MAC) {
+                // LAN channel: keep the server and state-polling running so the Mac agent can
+                // auto-switch back to MAC_BRIDGE as soon as it reconnects.
+                if (!macBridgeServer.isRunning) {
+                    val tok = dataStore.readLanPairTokenForPlatform(HostPlatform.MAC).trim().takeIf { it.isNotEmpty() }
+                    macBridgeServer.setPairToken(tok)
+                    macBridgeServer.start(externalScope)
+                }
+                startMacBridgeStatePolling()
+                if (!skipLanDiscovery && activePlatform == HostPlatform.MAC) {
                     attemptLanUdpDiscoveryAndHealth()
                 }
             }
@@ -1417,6 +1545,38 @@ class DeckBridgeRepositoryImpl(
         )
     }
 
+    override suspend fun applyMacBridgeToken(bridgeToken: String) = withContext(Dispatchers.IO) {
+        // Persist platform and token
+        dataStore.writeHostAutoDetect(false)
+        dataStore.writePersistedHostPlatform(HostPlatform.MAC)
+        dataStore.writeLanPairTokenForPlatform(HostPlatform.MAC, bridgeToken)
+        dataStore.writeMacSlotChannel(HostDeliveryChannel.MAC_BRIDGE)
+        // Apply token to server immediately
+        macBridgeServer.setPairToken(bridgeToken)
+        // Sync in-memory state: platform → MAC, Mac slot → MAC_BRIDGE + paired
+        _appState.update { prev ->
+            DeckCatalog.withHostPlatform(prev, HostPlatform.MAC, res).let { updated ->
+                updated.copy(
+                    hostPlatformSource = HostPlatformSource.MANUAL,
+                    hostDetectionDetail = app.getString(R.string.host_detect_manual),
+                    macSlot = updated.macSlot.copy(
+                        channel = HostDeliveryChannel.MAC_BRIDGE,
+                        pairActive = true,
+                        pairTokenValid = true,
+                        trustOk = true,
+                    ),
+                )
+            }
+        }
+        // Point router to MAC_BRIDGE
+        hostDeliveryRouter.setActiveChannel(HostDeliveryChannel.MAC_BRIDGE)
+        hostDeliveryRouter.setActiveLanDispatcher(dispatcherForPlatform(HostPlatform.MAC))
+        // Ensure server is up and polling is active
+        if (!macBridgeServer.isRunning) macBridgeServer.start(externalScope)
+        startMacBridgeStatePolling()
+        DeckBridgeLog.lan("MAC_BRIDGE token applied from QR — server=${macBridgeServer.isRunning} paired=true")
+    }
+
     override suspend fun clearLanPairToken() = withContext(Dispatchers.IO) {
         val plat = lanPlatformForEndpoints()
         dataStore.writeLanPairTokenForPlatform(plat, null)
@@ -1473,52 +1633,10 @@ class DeckBridgeRepositoryImpl(
         }
     }
 
-    override fun setHidPcModeEnabled(enabled: Boolean) {
-        externalScope.launch {
-            dataStore.writeHidPcMode(enabled)
-            PrivilegedShellProbe.invalidateCache()
-            hidTransportDispatcher.setHidPcModeEnabled(enabled)
-            _appState.update { prev -> prev.copy(hidPcModeEnabled = enabled) }
-            refreshHostAndTransportInternal()
-        }
-    }
-
     private suspend fun refreshHostAndTransportInternal(forceAuto: Boolean = false) {
         val prevLanPlatform = _appState.value.hostPlatform.normalizeForLanPersistence()
         val auto = forceAuto || dataStore.readHostAutoDetect()
-        val probe = withContext(Dispatchers.IO) { hidGadgetSession.probe() }
-        hidTransportDispatcher.updateTransportState(probe.keyboardWritable, probe.consumerWritable)
-        DeckBridgeLog.hid(
-            "probe phase=${probe.phase} | keyboard path=${probe.keyboardPath} exists=${probe.keyboardExists} writable=${probe.keyboardWritable} | consumer path=${probe.consumerPath} exists=${probe.consumerExists} writable=${probe.consumerWritable} | err=${probe.lastError}",
-        )
         val usbConnected = HostOsDetector.peekUsbConnected(app)
-        val hidPcMode = dataStore.readHidPcModeOrNull() ?: false
-        hidTransportDispatcher.setHidPcModeEnabled(hidPcMode)
-        val rootAvail = PrivilegedShellProbe.isAvailable()
-        when {
-            !probe.keyboardExists && !probe.consumerExists -> {
-                DeckBridgeLog.hid(app.getString(R.string.hid_log_diagnose_no_nodes))
-                if (rootAvail) {
-                    DeckBridgeLog.hid(app.getString(R.string.hid_log_diagnose_root_ok_no_hidg))
-                }
-            }
-            probe.keyboardExists && !probe.keyboardWritable -> {
-                DeckBridgeLog.hid(
-                    app.getString(
-                        R.string.hid_log_diagnose_keyboard_denied,
-                        probe.lastError ?: "—",
-                    ),
-                )
-            }
-            probe.keyboardWritable && (!probe.consumerExists || !probe.consumerWritable) -> {
-                DeckBridgeLog.hid(
-                    app.getString(R.string.hid_log_diagnose_media_only, probe.consumerPath),
-                )
-            }
-        }
-        val hidUi = HidTransportUiMapper.toUiState(probe, res, rootAvail)
-        val hidDebugLine = HidDebugLineFormatter.format(rootAvail, hidPcMode, usbConnected, probe)
-        DeckBridgeLog.hid("[DBG] $hidDebugLine")
         if (auto) {
             val det = HostOsDetector.detect(usbConnected)
             val detail = hostAutoDetail(det)
@@ -1527,11 +1645,6 @@ class DeckBridgeRepositoryImpl(
                 DeckCatalog.withHostPlatform(prev, det.platform, res).copy(
                     hostPlatformSource = HostPlatformSource.AUTOMATIC,
                     hostDetectionDetail = detail,
-                    hidTransport = hidUi,
-                    hidPcModeEnabled = hidPcMode,
-                    privilegedShellAvailable = rootAvail,
-                    hidDebugLine = hidDebugLine,
-                    hostConnection = mergeHostUsb(prev.hostConnection, usbConnected, hidUi.canSendKeyboard),
                 )
             }
             val newPl = det.platform.normalizeForLanPersistence()
@@ -1550,11 +1663,6 @@ class DeckBridgeRepositoryImpl(
                 DeckCatalog.withHostPlatform(prev, stored, res).copy(
                     hostPlatformSource = HostPlatformSource.MANUAL,
                     hostDetectionDetail = app.getString(R.string.host_detect_manual),
-                    hidTransport = hidUi,
-                    hidPcModeEnabled = hidPcMode,
-                    privilegedShellAvailable = rootAvail,
-                    hidDebugLine = hidDebugLine,
-                    hostConnection = mergeHostUsb(prev.hostConnection, usbConnected, hidUi.canSendKeyboard),
                 )
             }
             val newPl = stored.normalizeForLanPersistence()
@@ -1574,24 +1682,6 @@ class DeckBridgeRepositoryImpl(
             app.getString(R.string.host_detect_usb_disconnected)
         HostOsDetector.DetailKey.USB_CONNECTED_OS_UNKNOWN ->
             app.getString(R.string.host_detect_usb_unknown_os)
-    }
-
-    private fun mergeHostUsb(
-        prev: HostConnectionStatus,
-        usbConnected: Boolean,
-        hidKeyboardReady: Boolean,
-    ): HostConnectionStatus {
-        val usbState = when {
-            !usbConnected -> HostUsbConnectionState.NOT_CONNECTED
-            hidKeyboardReady -> HostUsbConnectionState.READY
-            else -> HostUsbConnectionState.ATTACHED_IDLE
-        }
-        val detail = when {
-            !usbConnected -> app.getString(R.string.usb_state_not_connected)
-            hidKeyboardReady -> app.getString(R.string.host_usb_hid_ready)
-            else -> app.getString(R.string.host_usb_attached_no_hid)
-        }
-        return prev.copy(usbState = usbState, detail = detail)
     }
 
     override fun triggerDeckButton(buttonId: String, source: ButtonTriggerSource) {
@@ -1693,6 +1783,7 @@ class DeckBridgeRepositoryImpl(
                     detected.size,
                     first.deviceId,
                 ),
+                batteryLevel = readInputDeviceBatteryLevel(first.deviceId),
             )
         } else {
             PhysicalKeyboardStatus(
@@ -1700,6 +1791,68 @@ class DeckBridgeRepositoryImpl(
                 deviceName = null,
                 detail = app.getString(R.string.physical_kb_detail_disconnected),
             )
+        }
+    }
+
+    /**
+     * Returns battery level 0–100 for the given input device, or null when unavailable.
+     *
+     * Tries two strategies in order:
+     *  1. [InputDevice.getBatteryState] (API 31+) — works when the input framework has a battery
+     *     report (BT HID battery characteristic or USB battery status).
+     *  2. [android.bluetooth.BluetoothDevice.getBatteryLevel] via reflection — reads the level
+     *     cached by the system BLE Battery Service; requires no runtime permission.
+     */
+    private fun readInputDeviceBatteryLevel(deviceId: Int): Int? {
+        // Strategy 1 – InputDevice battery state (API 31+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val device = InputDevice.getDevice(deviceId)
+            val battery = device?.batteryState
+            DeckBridgeLog.state("batteryState deviceId=$deviceId present=${battery?.isPresent} capacity=${battery?.capacity}")
+            if (battery != null && battery.isPresent) {
+                val capacity = battery.capacity
+                if (!capacity.isNaN() && capacity >= 0f) {
+                    return (capacity * 100f).toInt().coerceIn(0, 100)
+                }
+            }
+        }
+        // Strategy 2 – BluetoothDevice.getBatteryLevel() (hidden API, no permission needed)
+        return readBtDeviceBatteryLevelForInputDevice(deviceId)
+    }
+
+    /**
+     * Attempts to read the BLE Battery Service level via the BluetoothAdapter hidden API.
+     * No permission is required: getDefaultAdapter() and getBondedDevices() (pre-API-31 path)
+     * are used to enumerate paired HID devices and call the hidden getBatteryLevel().
+     * On API 31+ the bonded set is accessed via reflection to avoid requiring BLUETOOTH_CONNECT.
+     */
+    @Suppress("DiscouragedPrivateApi", "UNCHECKED_CAST")
+    private fun readBtDeviceBatteryLevelForInputDevice(deviceId: Int): Int? {
+        // BLUETOOTH_CONNECT is required on API 31+ to enumerate bonded devices.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            app.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+        ) return null
+        return try {
+            val adapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter() ?: return null
+            val getBonded = adapter.javaClass.getMethod("getBondedDevices")
+            @Suppress("UNCHECKED_CAST")
+            val bonded = (getBonded.invoke(adapter) as? Set<android.bluetooth.BluetoothDevice>)
+                ?: return null
+            val getBatteryLevel = android.bluetooth.BluetoothDevice::class.java
+                .getMethod("getBatteryLevel")
+            var bestLevel: Int? = null
+            for (btDevice in bonded) {
+                val level = getBatteryLevel.invoke(btDevice) as? Int ?: continue
+                if (level < 0) continue   // -1 = unknown
+                DeckBridgeLog.state("btBattery ${btDevice.name} level=$level")
+                bestLevel = level
+                break
+            }
+            bestLevel
+        } catch (e: Exception) {
+            val cause = (e as? java.lang.reflect.InvocationTargetException)?.cause ?: e
+            DeckBridgeLog.state("btBattery failed: ${cause::class.simpleName} ${cause.message}")
+            null
         }
     }
 
@@ -1910,6 +2063,9 @@ class DeckBridgeRepositoryImpl(
     companion object {
         private const val MAX_ACTIVATIONS = 25
         private const val MAX_RAW_DIAGNOSTICS = 60
+        private val BATTERY_SERVICE_UUID = java.util.UUID.fromString("0000180f-0000-1000-8000-00805f9b34fb")
+        private val BATTERY_LEVEL_CHAR_UUID = java.util.UUID.fromString("00002a19-0000-1000-8000-00805f9b34fb")
+        private const val KEEP_ALIVE_PING_INTERVAL_MS = 20_000L
         private const val KEYBOARD_SCAN_MIN_INTERVAL_MS = 900L
         private const val MIRROR_CLEAR_MAX_WAIT_MS = 400L
         private const val DEVICE_REFRESH_DEBOUNCE_MS = 400L

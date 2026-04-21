@@ -21,4 +21,6 @@ data class PlatformSlotState(
     val macBridgeClientIp: String? = null,
     val macBridgeServerRunning: Boolean = false,
     val macBridgeActionDropped: Boolean = false,
+    /** Local WiFi IP of this Android device — shown in Settings so the user can type it in the Mac agent. */
+    val macBridgeServerLocalIp: String? = null,
 )

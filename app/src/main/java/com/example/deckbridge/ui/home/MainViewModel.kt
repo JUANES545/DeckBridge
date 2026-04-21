@@ -51,14 +51,6 @@ class MainViewModel(
         repository.setHostAutoDetect(enabled)
     }
 
-    fun refreshHostAndTransport() {
-        repository.refreshHostAndTransport()
-    }
-
-    fun setHidPcModeEnabled(enabled: Boolean) {
-        repository.setHidPcModeEnabled(enabled)
-    }
-
     fun setHostDeliveryChannel(channel: HostDeliveryChannel) {
         repository.setHostDeliveryChannel(channel)
     }
@@ -97,6 +89,10 @@ class MainViewModel(
 
     fun setAnimatedBackgroundTheme(theme: AnimatedBackgroundTheme) {
         repository.setAnimatedBackgroundTheme(theme)
+    }
+
+    fun setKeepKeyboardAwake(enabled: Boolean) {
+        repository.setKeepKeyboardAwake(enabled)
     }
 
     companion object {

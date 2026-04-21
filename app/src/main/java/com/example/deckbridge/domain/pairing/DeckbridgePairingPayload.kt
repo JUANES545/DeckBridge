@@ -34,6 +34,12 @@ object DeckbridgePairingPayload {
         val hostDisplayName: String? = null,
         /** From `os=` in the deeplink; applied before LAN bootstrap so the correct host slot is used. */
         val suggestedHostPlatform: HostPlatform? = null,
+        /**
+         * MAC_BRIDGE direct token: when present the Mac agent embeds its pair token directly in the
+         * QR (no LAN HTTP round-trip needed). Android sets this token on its bridge server and the
+         * Mac agent polls immediately. Only valid when [suggestedHostPlatform] == MAC.
+         */
+        val bridgeToken: String? = null,
     )
 
     fun parse(raw: String): Bootstrap? {
@@ -71,9 +77,10 @@ object DeckbridgePairingPayload {
             }
             return null
         }
-        val h = qp("host", "h") ?: return null
-        val host = h.trim()
-        if (host.isEmpty()) return null
+        val tok = qp("tok", "token")?.trim()?.takeIf { it.isNotEmpty() }
+        val h = qp("host", "h")
+        // host is optional when a bridge token is present (MAC_BRIDGE flow; phone is the server)
+        val host = h?.trim() ?: if (tok != null) "" else return null
         val p = qp("port", "p")
         val port = p?.toIntOrNull()?.coerceIn(1, 65_535) ?: 8765
         val sid = qp("sid", "session")?.trim()?.takeIf { it.isNotEmpty() }
@@ -88,7 +95,7 @@ object DeckbridgePairingPayload {
         if (!v.isNullOrEmpty() && v != "1") {
             return null
         }
-        return Bootstrap(host, port, sid, name, suggested)
+        return Bootstrap(host, port, sid, name, suggested, tok)
     }
 
     private val ipv4WithOptionalPort = Regex("""^(\d{1,3}(?:\.\d{1,3}){3})(?::(\d+))?$""")

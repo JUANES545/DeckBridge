@@ -449,7 +449,8 @@ fun PcConnectionHomeScreen(
                 OnboardingSecondaryCta(
                     text = stringResource(R.string.connect_get_help),
                     onClick = { viewModel.openHelp() },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth(),
                 )
             }
         }

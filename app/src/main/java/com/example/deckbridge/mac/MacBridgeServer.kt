@@ -12,6 +12,7 @@ import java.io.InputStreamReader
 import java.io.PrintWriter
 import java.net.DatagramPacket
 import java.net.DatagramSocket
+import java.net.InetSocketAddress
 import java.net.NetworkInterface
 import java.net.ServerSocket
 import java.net.Socket
@@ -99,15 +100,29 @@ class MacBridgeServer {
     // ── Server loop ──────────────────────────────────────────────────────────
 
     private fun acceptLoop() {
-        try {
-            serverSocket = ServerSocket(PORT).also { it.reuseAddress = true }
-            DeckBridgeLog.lan("MacBridgeServer listening on 0.0.0.0:$PORT")
-            while (running.get()) {
-                val client = runCatching { serverSocket!!.accept() }.getOrNull() ?: break
-                handleClientAsync(client)
+        // Outer loop: retry binding on failure (e.g. port in TIME_WAIT from previous session).
+        while (running.get()) {
+            try {
+                // reuseAddress MUST be set before bind; setting it after (as in new ServerSocket(port))
+                // has no effect on the current socket and leaves the port stuck in TIME_WAIT.
+                val sock = ServerSocket()
+                sock.reuseAddress = true
+                sock.bind(InetSocketAddress(PORT))
+                serverSocket = sock
+                DeckBridgeLog.lan("MacBridgeServer listening on 0.0.0.0:$PORT")
+                while (running.get()) {
+                    val client = runCatching { serverSocket!!.accept() }.getOrNull() ?: break
+                    handleClientAsync(client)
+                }
+            } catch (e: Exception) {
+                if (running.get()) {
+                    DeckBridgeLog.lan("MacBridgeServer bind/accept error: ${e.message} — retry in 3 s")
+                    runCatching { Thread.sleep(3_000) }
+                }
+            } finally {
+                serverSocket?.runCatching { close() }
+                serverSocket = null
             }
-        } catch (e: Exception) {
-            if (running.get()) DeckBridgeLog.lan("MacBridgeServer accept error: ${e.message}")
         }
     }
 
@@ -219,7 +234,7 @@ class MacBridgeServer {
     }
 
     /** First non-loopback, non-link-local IPv4 address — the phone's WiFi IP. */
-    private fun localWifiIp(): String? = runCatching {
+    fun localWifiIp(): String? = runCatching {
         NetworkInterface.getNetworkInterfaces()?.toList()
             ?.filter { it.isUp && !it.isLoopback }
             ?.flatMap { it.inetAddresses.toList() }

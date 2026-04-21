@@ -2,10 +2,8 @@ package com.example.deckbridge
 
 import android.app.Application
 import com.example.deckbridge.actions.HostDeliveryRouter
-import com.example.deckbridge.actions.HidTransportDispatcher
 import com.example.deckbridge.actions.LoggingActionDispatcher
 import com.example.deckbridge.domain.model.HostDeliveryChannel
-import com.example.deckbridge.hid.HidGadgetSession
 import com.example.deckbridge.lan.LanCircuitBreaker
 import com.example.deckbridge.lan.LanHostClient
 import com.example.deckbridge.lan.LanTransportDispatcher
@@ -15,7 +13,6 @@ import com.example.deckbridge.data.preferences.deckBridgePreferences
 import com.example.deckbridge.data.repository.DeckBridgeRepository
 import com.example.deckbridge.data.repository.DeckBridgeRepositoryImpl
 import com.example.deckbridge.logging.DeckBridgeLog
-import com.example.deckbridge.logging.SessionFileLog
 import com.example.deckbridge.update.AppUpdateManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -34,12 +31,9 @@ class DeckBridgeApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        SessionFileLog.init(this)
-        DeckBridgeLog.state("Application onCreate · DeckBridge sessionFile=${SessionFileLog.currentFileOrNull()?.absolutePath}")
+        DeckBridgeLog.state("Application onCreate · DeckBridge")
 
-        val hidGadgetSession = HidGadgetSession()
         val loggingDispatcher = LoggingActionDispatcher()
-        val hidTransportDispatcher = HidTransportDispatcher(hidGadgetSession, loggingDispatcher)
 
         // One LAN client + dispatcher per platform slot
         val winLanClient = LanHostClient()
@@ -55,7 +49,7 @@ class DeckBridgeApplication : Application() {
         // Router starts pointing to Windows LAN (default active slot = WINDOWS)
         val channelRef = AtomicReference(HostDeliveryChannel.LAN)
         val activeLanRef = AtomicReference<LanTransportDispatcher>(winLanDispatcher)
-        val hostDeliveryRouter = HostDeliveryRouter(channelRef, activeLanRef, hidTransportDispatcher, macBridgeDispatcher)
+        val hostDeliveryRouter = HostDeliveryRouter(channelRef, activeLanRef, macBridgeDispatcher)
 
         repository = DeckBridgeRepositoryImpl(
             appContext = this,
@@ -67,8 +61,6 @@ class DeckBridgeApplication : Application() {
             macLanDispatcher = macLanDispatcher,
             winCircuitBreaker = winCircuitBreaker,
             macCircuitBreaker = macCircuitBreaker,
-            hidTransportDispatcher = hidTransportDispatcher,
-            hidGadgetSession = hidGadgetSession,
             macBridgeServer = macBridgeServer,
             dataStore = deckBridgePreferences(),
         )
@@ -79,7 +71,6 @@ class DeckBridgeApplication : Application() {
     }
 
     override fun onTrimMemory(level: Int) {
-        SessionFileLog.flush()
         super.onTrimMemory(level)
     }
 }

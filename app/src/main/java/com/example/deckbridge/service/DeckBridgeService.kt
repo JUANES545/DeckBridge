@@ -28,11 +28,16 @@ class DeckBridgeService : Service() {
     override fun onCreate() {
         super.onCreate()
         ensureNotificationChannel()
+        // Call startForeground() immediately in onCreate so Android's 5-second deadline
+        // is met even on devices with aggressive battery optimization (e.g. LineageOS).
+        // onStartCommand() may be queued behind other main-thread work and arrive late.
+        startForeground(NOTIFICATION_ID, buildNotification())
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        DeckBridgeLog.state("DeckBridgeService: started (background mode)")
+        // Re-promote to foreground in case the service was demoted or restarted by the system.
         startForeground(NOTIFICATION_ID, buildNotification())
+        DeckBridgeLog.state("DeckBridgeService: started (background mode)")
         return START_STICKY
     }
 
