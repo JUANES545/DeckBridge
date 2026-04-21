@@ -8,8 +8,13 @@ import com.example.deckbridge.domain.hardware.KnobMirrorRotationAccum
 import com.example.deckbridge.domain.hardware.RawDiagnosticLine
 import com.example.deckbridge.profiles.Profile
 
+
 /**
  * Coherent snapshot of what the home surface needs. Mirrors domain concepts without UI types.
+ *
+ * LAN/Mac Bridge connection state is split into [windowsSlot] and [macSlot] so both PCs are
+ * monitored simultaneously. The backward-compat flat fields (e.g. [lanServerHost]) are computed
+ * from [activeSlot] and require no changes in most UI code.
  */
 data class AppState(
     val hostPlatform: HostPlatform,
@@ -18,7 +23,7 @@ data class AppState(
     /** Short explanation for Settings (detection result or manual hint). */
     val hostDetectionDetail: String,
     val physicalKeyboard: PhysicalKeyboardStatus,
-    val hostConnection: HostConnectionStatus,
+
     val activeProfile: Profile,
     val macroButtons: List<MacroButton>,
     /** Persisted knob row (CCW / CW / press actions); labels feed the mirror UI. */
@@ -29,7 +34,7 @@ data class AppState(
     val deckHighlight: DeckButtonHighlight?,
     /** Last deck button activations (touch vs hardware vs simulated). */
     val recentDeckActivations: List<DeckActivationLogEntry>,
-    /** Short line for the “system status” strip (battery, permissions, etc. later). */
+    /** Short line for the "system status" strip. */
     val systemStatusLine: String,
     /** Loaded hardware calibration (pad + knobs); null until learned or cleared. */
     val hardwareCalibration: HardwareCalibrationConfig?,
@@ -41,35 +46,38 @@ data class AppState(
     val hardwareDiagSummary: HardwareDiagSummary?,
     /** Raw KEY/MOTION lines for deep debugging (capped in repository). */
     val rawInputDiagnostics: List<RawDiagnosticLine>,
-    /** USB gadget HID transport (keyboard / consumer); usually unavailable without root + gadget. */
-    val hidTransport: HidTransportUiState,
-    /** When true, DeckBridge may write to `/dev/hidg*` (still requires gadget nodes + permissions). */
-    val hidPcModeEnabled: Boolean,
-    /** `su` works for this app (e.g. KernelSU grant). */
-    val privilegedShellAvailable: Boolean,
-    /** Same one-line snapshot as `[DBG]` in Logcat (HID + root + USB cable). */
-    val hidDebugLine: String,
-    /** User preference: send actions over LAN HTTP agent vs USB gadget HID. */
-    val hostDeliveryChannel: HostDeliveryChannel,
-    /** PC LAN agent hostname or IPv4 (no auth in prototype). */
-    val lanServerHost: String,
-    val lanServerPort: Int,
-    /** Result of last manual health check in this session; null = not tested yet. */
-    val lanHealthOk: Boolean?,
-    /** Last `/health` failure message (Logcat + Settings) when [lanHealthOk] is false. */
-    val lanHealthDetail: String?,
-    /** True when a LAN pair token is persisted for the current saved host (UX: “already linked on this phone”). */
-    val lanPersistedPairActive: Boolean,
-    /**
-     * Last `/health` evaluation of `pairing.pair_token_valid` when the client sent [LanHostClient]’s pair token;
-     * null if the server omitted the field (unauthenticated probe or older agent).
-     */
-    val lanPairTokenValid: Boolean?,
-    /**
-     * Application-side “we may treat this PC as linked for deck + gate”: false after the host rejects the token
-     * until the user re-pairs or uses “Forget link”.
-     */
-    val lanTrustOk: Boolean,
     /** Subtle animated grid background on the home dashboard (persisted). */
     val animatedBackgroundMode: AnimatedBackgroundMode,
-)
+    val animatedBackgroundTheme: AnimatedBackgroundTheme = AnimatedBackgroundTheme.GRID_PULSE,
+    /** Briefly true after a deck action could not be delivered to the host. Auto-clears. */
+    val lastActionFailed: Boolean = false,
+
+    // ── Per-slot connection state ─────────────────────────────────────────────
+    /** Windows PC slot connection state (always LAN channel). */
+    val windowsSlot: PlatformSlotState = PlatformSlotState(channel = HostDeliveryChannel.LAN),
+    /** Mac slot connection state (LAN or Mac Bridge). */
+    val macSlot: PlatformSlotState = PlatformSlotState(channel = HostDeliveryChannel.MAC_BRIDGE),
+    /** When true the repository maintains a GATT keep-alive ping to prevent the BT keyboard from sleeping. */
+    val keepKeyboardAwake: Boolean = false,
+) {
+    // ── Active slot ──────────────────────────────────────────────────────────
+    val activeSlot: PlatformSlotState get() = when (hostPlatform.coerceForDeckData()) {
+        HostPlatform.MAC -> macSlot
+        else -> windowsSlot
+    }
+
+    // ── Backward-compat computed properties (read from active slot) ──────────
+    val hostDeliveryChannel: HostDeliveryChannel get() = activeSlot.channel
+    val lanServerHost: String get() = activeSlot.host
+    val lanServerPort: Int get() = activeSlot.port
+    val lanHealthOk: Boolean? get() = activeSlot.healthOk
+    val lanHealthRetrying: Boolean get() = activeSlot.healthRetrying
+    val lanHealthDetail: String? get() = activeSlot.healthDetail
+    val lanTrustOk: Boolean get() = activeSlot.trustOk
+    val lanPersistedPairActive: Boolean get() = activeSlot.pairActive
+    val lanPairTokenValid: Boolean? get() = activeSlot.pairTokenValid
+    val macBridgeClientAlive: Boolean get() = macSlot.macBridgeClientAlive
+    val macBridgeClientIp: String? get() = macSlot.macBridgeClientIp
+    val macBridgeServerRunning: Boolean get() = macSlot.macBridgeServerRunning
+    val macBridgeActionDropped: Boolean get() = macSlot.macBridgeActionDropped
+}

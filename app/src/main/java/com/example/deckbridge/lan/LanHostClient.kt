@@ -37,9 +37,11 @@ class LanHostClient {
         private set
 
     private val http = OkHttpClient.Builder()
-        .connectTimeout(4, TimeUnit.SECONDS)
-        .readTimeout(8, TimeUnit.SECONDS)
-        .writeTimeout(8, TimeUnit.SECONDS)
+        .connectTimeout(6, TimeUnit.SECONDS)
+        // 5 s is plenty for a local-network round-trip; 15 s was delaying circuit-breaker
+        // activation by up to 45 s (3 failures × 15 s) on an unreachable PC.
+        .readTimeout(5, TimeUnit.SECONDS)
+        .writeTimeout(5, TimeUnit.SECONDS)
         .build()
 
     fun updateEndpoint(host: String, port: Int) {
@@ -61,7 +63,7 @@ class LanHostClient {
     }
 
     suspend fun getHealthDetailed(): LanHealthResult = withContext(Dispatchers.IO) {
-        val base = baseUrlOrNull() ?: return@withContext LanHealthResult(false, "Sin host", null)
+        val base = baseUrlOrNull() ?: return@withContext LanHealthResult(false, "No host configured", null)
         runCatching {
             val req = Request.Builder().url("$base/health").get().addPairAuth().build()
             http.newCall(req).execute().use { resp ->
@@ -70,9 +72,9 @@ class LanHostClient {
                 }
                 val body = resp.body?.string().orEmpty()
                 val root = runCatching { JSONObject(body) }.getOrNull()
-                    ?: return@withContext LanHealthResult(false, "JSON inválido", null)
+                    ?: return@withContext LanHealthResult(false, "Invalid JSON from agent", null)
                 if (!root.optBoolean("ok")) {
-                    return@withContext LanHealthResult(false, "Respuesta sin ok=true", null)
+                    return@withContext LanHealthResult(false, "Agent replied ok=false", null)
                 }
                 root.optString("agent_os", "").trim().takeIf { it.isNotEmpty() }?.let { os ->
                     DeckBridgeLog.lan("health agent_os=$os url=$base")

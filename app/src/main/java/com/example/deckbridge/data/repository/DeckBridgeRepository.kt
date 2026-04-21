@@ -6,6 +6,7 @@ import com.example.deckbridge.domain.deck.DeckGridButtonPersisted
 import com.example.deckbridge.domain.deck.DeckKnobPersisted
 import com.example.deckbridge.domain.hardware.CalibrationSessionUi
 import com.example.deckbridge.domain.model.AnimatedBackgroundMode
+import com.example.deckbridge.domain.model.AnimatedBackgroundTheme
 import com.example.deckbridge.domain.model.AppState
 import com.example.deckbridge.domain.model.ButtonTriggerSource
 import com.example.deckbridge.domain.model.HostDeliveryChannel
@@ -89,17 +90,9 @@ interface DeckBridgeRepository {
     /** When true, host platform follows [HostOsDetector] (usually UNKNOWN + manual hint). */
     fun setHostAutoDetect(enabled: Boolean)
 
-    /** Re-probes USB gadget HID nodes and host USB stickiness; call on resume / USB events. */
-    fun refreshHostAndTransport()
-
-    /**
-     * When enabled, the app may send to `/dev/hidg*` when nodes exist (Settings “Modo HID al PC”).
-     * Persisted; default on first install follows privileged shell availability.
-     */
-    fun setHidPcModeEnabled(enabled: Boolean)
-
     /** Persisted: subtle animated home background (always / while charging / off). */
     fun setAnimatedBackgroundMode(mode: AnimatedBackgroundMode)
+    fun setAnimatedBackgroundTheme(theme: AnimatedBackgroundTheme)
 
     /** Persisted: route deck actions to the LAN HTTP agent vs USB gadget HID. */
     fun setHostDeliveryChannel(channel: HostDeliveryChannel, skipLanDiscovery: Boolean = false)
@@ -143,6 +136,13 @@ interface DeckBridgeRepository {
     /** Persists opaque [pairToken] and attaches it to subsequent LAN /action and /health calls. */
     suspend fun persistLanPairToken(pairToken: String)
 
+    /**
+     * MAC_BRIDGE direct pairing: persists [bridgeToken] for the Mac slot, switches the Mac slot to
+     * MAC_BRIDGE channel, sets the platform to Mac, and ensures the bridge server and state polling
+     * are running. No LAN HTTP round-trip needed — token came directly from the QR.
+     */
+    suspend fun applyMacBridgeToken(bridgeToken: String)
+
     /** Clears saved pair token (e.g. user switches PC or pairing aborted). */
     suspend fun clearLanPairToken()
 
@@ -151,6 +151,18 @@ interface DeckBridgeRepository {
      * re-pair from the connection flow (saved host/port are kept for convenience).
      */
     fun forgetTrustedLanHostLink()
+
+    /** Persisted LAN endpoint for a specific platform slot (not necessarily the active one). */
+    fun setLanEndpointForPlatform(platform: HostPlatform, host: String, port: Int)
+
+    /** Probes /health for the given platform slot (does not change active endpoint). */
+    fun testLanHealthForPlatform(platform: HostPlatform)
+
+    /** Clears pair token and trust for the given platform slot. */
+    fun forgetTrustedLanHostLinkForPlatform(platform: HostPlatform)
+
+    /** Sets the Mac slot's delivery channel (LAN or MAC_BRIDGE). */
+    fun setMacSlotChannel(channel: HostDeliveryChannel)
 
     /**
      * When delivery is LAN: UDP discovery for the PC agent, then `/health`.
@@ -194,4 +206,13 @@ interface DeckBridgeRepository {
 
     /** Replaces one knob with the factory preset for the same id (keeps [DeckKnobPersisted.sortIndex]). */
     suspend fun resetDeckKnobToDefault(knobId: String): Result<Unit>
+
+    /**
+     * Release system resources held by the repository (e.g. [android.hardware.input.InputManager]
+     * listener). Call when the owning lifecycle is permanently destroyed.
+     */
+    /** Persisted: send periodic BLE pings to prevent the BT keyboard from auto-sleeping. */
+    fun setKeepKeyboardAwake(enabled: Boolean)
+
+    fun cleanup()
 }

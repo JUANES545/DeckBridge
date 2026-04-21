@@ -6,8 +6,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import android.content.Intent
+import android.provider.Settings
 import com.example.deckbridge.DeckBridgeApplication
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
@@ -24,6 +28,7 @@ import com.example.deckbridge.ui.deck.GridButtonEditScreen
 import com.example.deckbridge.ui.deck.GridButtonEditViewModel
 import com.example.deckbridge.ui.deck.KnobEditScreen
 import com.example.deckbridge.ui.deck.KnobEditViewModel
+import com.example.deckbridge.domain.model.HostPlatform
 import com.example.deckbridge.ui.home.HomeScreen
 import com.example.deckbridge.ui.home.MainViewModel
 import com.example.deckbridge.logging.DeckBridgeLog
@@ -57,6 +62,7 @@ fun DeckBridgeNavHost(
 ) {
     val app = LocalContext.current.applicationContext as DeckBridgeApplication
     val repository = app.repository
+    val updateManager = app.updateManager
     val gateActive by repository.initialConnectGateActive.collectAsStateWithLifecycle()
     val onLeaveConnectionGate = {
         repository.markSkipInitialPcConnect(true)
@@ -76,12 +82,24 @@ fun DeckBridgeNavHost(
         modifier = modifier,
     ) {
         composable(DeckBridgeDestinations.HOME) {
-            val viewModel: MainViewModel = viewModel(factory = MainViewModel.factory(repository))
+            val viewModel: MainViewModel = viewModel(factory = MainViewModel.factory(repository, updateManager))
             val state by viewModel.state.collectAsStateWithLifecycle()
-            val linkLost by viewModel.showLanLinkLostDialog.collectAsStateWithLifecycle()
+            val updateState by viewModel.updateState.collectAsStateWithLifecycle()
+            val context = LocalContext.current
+            // Auto-retry download if user returns from "Install unknown apps" Settings screen
+            val lifecycleOwner = LocalLifecycleOwner.current
+            val lifecycleState by lifecycleOwner.lifecycle.currentStateFlow.collectAsStateWithLifecycle()
+            LaunchedEffect(lifecycleState) {
+                if (lifecycleState == Lifecycle.State.RESUMED) viewModel.retryUpdateAfterPermissionGrant()
+            }
             val defaultKnobIds = remember { listOf("knob_top", "knob_middle", "knob_bottom") }
             HomeScreen(
                 state = state,
+                updateState = updateState,
+                onUpdateTapped = { viewModel.onUpdateTapped(context) },
+                onUpdatePermissionTapped = { viewModel.onUpdatePermissionTapped(context) },
+                onInstallTapped = { uri -> viewModel.onInstallTapped(context, uri) },
+                onUpdateDismissed = viewModel::onUpdateDismissed,
                 onDeckButtonTapped = viewModel::onDeckButtonTapped,
                 onDeckButtonLongPress = { buttonId ->
                     navController.navigate(DeckBridgeDestinations.gridEditRoute(buttonId))
@@ -95,8 +113,7 @@ fun DeckBridgeNavHost(
                 },
                 onHostPlatformSelected = viewModel::onHostPlatformSelected,
                 onOpenSettings = { navController.navigate(DeckBridgeDestinations.SETTINGS) },
-                showLanLinkLostDialog = linkLost,
-                onLanLinkLostGoToConnect = {
+                onGoToConnect = {
                     navController.navigate(DeckBridgeDestinations.connectGraphRoute(addAnotherHost = false)) {
                         launchSingleTop = true
                     }
@@ -104,8 +121,9 @@ fun DeckBridgeNavHost(
             )
         }
         composable(DeckBridgeDestinations.SETTINGS) {
-            val viewModel: MainViewModel = viewModel(factory = MainViewModel.factory(repository))
+            val viewModel: MainViewModel = viewModel(factory = MainViewModel.factory(repository, updateManager))
             val state by viewModel.state.collectAsStateWithLifecycle()
+            val context = LocalContext.current
             SettingsScreen(
                 state = state,
                 onNavigateBack = { navController.popBackStack() },
@@ -115,18 +133,26 @@ fun DeckBridgeNavHost(
                         launchSingleTop = true
                     }
                 },
-                onRefreshKeyboards = {
-                    viewModel.refreshAttachedKeyboards()
-                    viewModel.refreshHostAndTransport()
-                },
+                onRefreshKeyboards = { viewModel.refreshAttachedKeyboards() },
                 onHostAutoDetectChanged = viewModel::setHostAutoDetect,
-                onHidPcModeChanged = viewModel::setHidPcModeEnabled,
-                onHostDeliveryChannelChanged = viewModel::setHostDeliveryChannel,
-                onApplyLanEndpoint = viewModel::applyLanEndpoint,
-                onTestLanHealth = viewModel::testLanHealth,
-                onForgetLanLink = viewModel::forgetTrustedLanHostLink,
+                onApplyWindowsEndpoint = { h, p -> viewModel.applyLanEndpointForPlatform(HostPlatform.WINDOWS, h, p) },
+                onTestWindowsHealth = { viewModel.testLanHealthForPlatform(HostPlatform.WINDOWS) },
+                onForgetWindowsLink = { viewModel.forgetLanLinkForPlatform(HostPlatform.WINDOWS) },
+                onApplyMacEndpoint = { h, p -> viewModel.applyLanEndpointForPlatform(HostPlatform.MAC, h, p) },
+                onTestMacHealth = { viewModel.testLanHealthForPlatform(HostPlatform.MAC) },
+                onForgetMacLink = { viewModel.forgetLanLinkForPlatform(HostPlatform.MAC) },
+                onSetMacSlotChannel = viewModel::setMacSlotChannel,
                 onOpenHardwareCalibration = { navController.navigate(DeckBridgeDestinations.CALIBRATION) },
                 onAnimatedBackgroundModeChanged = viewModel::setAnimatedBackgroundMode,
+                onAnimatedBackgroundThemeChanged = viewModel::setAnimatedBackgroundTheme,
+                onOpenAccessibilitySettings = {
+                    context.startActivity(
+                        Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                    )
+                },
+                onKeepKeyboardAwakeChanged = viewModel::setKeepKeyboardAwake,
             )
         }
         composable(DeckBridgeDestinations.CALIBRATION) {
@@ -148,7 +174,7 @@ fun DeckBridgeNavHost(
                 key = "grid_edit_$buttonId",
                 factory = GridButtonEditViewModel.factory(repository, buttonId),
             )
-            val mainVm: MainViewModel = viewModel(factory = MainViewModel.factory(repository))
+            val mainVm: MainViewModel = viewModel(factory = MainViewModel.factory(repository, updateManager))
             val deckState by mainVm.state.collectAsStateWithLifecycle()
             GridButtonEditScreen(
                 viewModel = gridVm,
@@ -167,7 +193,7 @@ fun DeckBridgeNavHost(
                 key = "knob_edit_$knobId",
                 factory = KnobEditViewModel.factory(repository, knobId),
             )
-            val mainVm: MainViewModel = viewModel(factory = MainViewModel.factory(repository))
+            val mainVm: MainViewModel = viewModel(factory = MainViewModel.factory(repository, updateManager))
             val deckState by mainVm.state.collectAsStateWithLifecycle()
             KnobEditScreen(
                 viewModel = knobVm,

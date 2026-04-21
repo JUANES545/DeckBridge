@@ -8,17 +8,14 @@ import com.example.deckbridge.domain.deck.DeckKnobsLayoutPersisted
 import com.example.deckbridge.domain.hardware.KnobMirrorRotationAccum
 import com.example.deckbridge.domain.model.AnimatedBackgroundMode
 import com.example.deckbridge.domain.model.AppState
-import com.example.deckbridge.domain.model.HidTransportUiState
-import com.example.deckbridge.domain.model.HostConnectionStatus
 import com.example.deckbridge.domain.model.HostDeliveryChannel
 import com.example.deckbridge.domain.model.HostPlatform
 import com.example.deckbridge.domain.model.HostPlatformSource
-import com.example.deckbridge.domain.model.HostUsbConnectionState
 import com.example.deckbridge.domain.model.InputDiagnostics
 import com.example.deckbridge.domain.model.PhysicalKeyBinding
 import com.example.deckbridge.domain.model.PhysicalKeyboardConnectionState
 import com.example.deckbridge.domain.model.PhysicalKeyboardStatus
-import com.example.deckbridge.lan.LanHostClient
+import com.example.deckbridge.domain.model.PlatformSlotState
 import com.example.deckbridge.profiles.Profile
 
 /**
@@ -96,11 +93,6 @@ object DeckCatalog {
                 deviceName = null,
                 detail = "",
             ),
-            hostConnection = HostConnectionStatus(
-                usbState = HostUsbConnectionState.NOT_CONNECTED,
-                hostLabel = res.getString(R.string.host_default_label),
-                detail = res.getString(R.string.host_usb_detail_placeholder),
-            ),
             activeProfile = profileFor(hostPlatform, res),
             macroButtons = macroButtons,
             deckKnobs = knobs,
@@ -122,22 +114,9 @@ object DeckCatalog {
             knobMirrorRotation = KnobMirrorRotationAccum(),
             hardwareDiagSummary = null,
             rawInputDiagnostics = emptyList(),
-            hidTransport = HidTransportUiState.initial(
-                summary = res.getString(R.string.hid_transport_summary_not_probed),
-                detail = res.getString(R.string.hid_transport_detail_default),
-            ),
-            hidPcModeEnabled = false,
-            privilegedShellAvailable = false,
-            hidDebugLine = "",
-            hostDeliveryChannel = HostDeliveryChannel.LAN,
-            lanServerHost = "",
-            lanServerPort = LanHostClient.DEFAULT_PORT,
-            lanHealthOk = null,
-            lanHealthDetail = null,
-            lanPersistedPairActive = false,
-            lanPairTokenValid = null,
-            lanTrustOk = true,
             animatedBackgroundMode = AnimatedBackgroundMode.WHEN_CHARGING,
+            windowsSlot = PlatformSlotState(channel = HostDeliveryChannel.LAN),
+            macSlot = PlatformSlotState(channel = HostDeliveryChannel.MAC_BRIDGE),
         )
     }
 
