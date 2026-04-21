@@ -133,12 +133,8 @@ fun DeckBridgeNavHost(
                         launchSingleTop = true
                     }
                 },
-                onRefreshKeyboards = {
-                    viewModel.refreshAttachedKeyboards()
-                    viewModel.refreshHostAndTransport()
-                },
+                onRefreshKeyboards = { viewModel.refreshAttachedKeyboards() },
                 onHostAutoDetectChanged = viewModel::setHostAutoDetect,
-                onHidPcModeChanged = viewModel::setHidPcModeEnabled,
                 onApplyWindowsEndpoint = { h, p -> viewModel.applyLanEndpointForPlatform(HostPlatform.WINDOWS, h, p) },
                 onTestWindowsHealth = { viewModel.testLanHealthForPlatform(HostPlatform.WINDOWS) },
                 onForgetWindowsLink = { viewModel.forgetLanLinkForPlatform(HostPlatform.WINDOWS) },
@@ -156,6 +152,7 @@ fun DeckBridgeNavHost(
                         }
                     )
                 },
+                onKeepKeyboardAwakeChanged = viewModel::setKeepKeyboardAwake,
             )
         }
         composable(DeckBridgeDestinations.CALIBRATION) {

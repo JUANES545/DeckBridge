@@ -128,9 +128,15 @@
     <string name="calibration_step_counter">Step %1$d of %2$d</string>
     <string name="calibration_last_capture">Captured: %s</string>
     <string name="calibration_step_pad">Press the physical key for pad cell row %1$d, column %2$d (row 1 = top, column 1 = left).</string>
-    <string name="calibration_step_knob_ccw">Turn %s one way (e.g. left / down). Send whatever key or scroll the device uses for that direction.</string>
-    <string name="calibration_step_knob_cw">Turn %s the opposite way (e.g. right / up). Use a different signal than the previous step.</string>
-    <string name="calibration_step_knob_press">Press %s once if it acts as a button. If Android never delivers a key for the press, tap “Skip press” — rotation mapping still works.</string>
+    <!-- Knob calibration — positional names used during wizard, not the app function label -->
+    <string name="calibration_knob_name_1">Knob 1 (top)</string>
+    <string name="calibration_knob_name_2">Knob 2 (middle)</string>
+    <string name="calibration_knob_name_3">Knob 3 (bottom)</string>
+    <string name="calibration_knob_section_header">Knob calibration</string>
+    <string name="calibration_knob_progress">Knob %1$d of 3</string>
+    <string name="calibration_step_knob_ccw">%s — rotate counter-clockwise (left). Your device may send a key (e.g. volume down) or a scroll event — either works.</string>
+    <string name="calibration_step_knob_cw">%s — rotate clockwise (right). Must be a different signal than the CCW direction.</string>
+    <string name="calibration_step_knob_press">%s — press / click the knob. If your knob doesn\'t click or Android gets no key, tap Skip press.</string>
     <string name="calibration_motion_hint">Rotation: Android may deliver KeyEvents (e.g. volume) and/or MotionEvent scroll. Press: only works if the device exposes a distinct KeyEvent; many knobs never do.</string>
     <string name="calibration_skip_press_button">Skip press</string>
     <string name="calibration_skipped_press_summary">(press skipped)</string>
@@ -287,9 +293,19 @@
     <string name="dash_lan_trust">LAN · link needs repair</string>
     <string name="dash_lan_no_host">LAN · choose a computer</string>
     <string name="dash_connection_dot_a11y">Connection: %1$s. %2$s</string>
+    <string name="dash_mac_bridge_inactive">Mac Bridge · inactive</string>
+    <string name="dash_mac_bridge_server_ready">Mac Bridge · waiting for Mac agent</string>
+    <!-- One-word labels for the compact (landscape) connection status pill -->
+    <string name="dash_status_short_online">Online</string>
+    <string name="dash_status_short_waiting">Waiting…</string>
+    <string name="dash_status_short_offline">Offline</string>
+    <string name="dash_status_short_inactive">Inactive</string>
     <string name="dash_mac_bridge_waiting">Mac Bridge · waiting</string>
     <string name="dash_mac_bridge_connected">Mac Bridge · connected</string>
     <string name="dash_mac_bridge_linked">Mac Bridge · linked</string>
+    <string name="banner_mac_bridge_title_waiting">Mac agent not connected</string>
+    <string name="banner_mac_bridge_body_server_ready">Start the Mac agent — bridge server is ready</string>
+    <string name="banner_mac_bridge_body_inactive">Mac Bridge server isn\'t running. Open DeckBridge settings.</string>
 
     <string name="settings_calibration_wizard_section">Hardware layout</string>
     <string name="settings_calibration_wizard_hint">Learn your pad keys and knobs on the physical device. You can re-run this anytime.</string>
@@ -346,7 +362,7 @@
     <string name="settings_hid_debug_empty">(empty until the next HID/USB refresh)</string>
     <string name="settings_hid_root_label">Privileged shell for this app</string>
     <string name="settings_host_auto_detect">Automatic host detection</string>
-    <string name="settings_host_auto_detect_hint">Experimental. Android cannot read Windows vs macOS from USB alone; you will often get “Unknown” and should pick the platform manually on the home screen.</string>
+    <string name="settings_host_auto_detect_hint">Experimental. Android cannot read Windows vs macOS from USB alone; you will often get "Unknown" and should pick the platform manually on the home screen.</string>
     <string name="settings_host_source_manual">Host: manual selection</string>
     <string name="settings_host_source_auto">Host: automatic (heuristic)</string>
     <string name="settings_hid_transport">HID transport</string>
@@ -422,7 +438,7 @@
     <string name="connect_searching_hint">Searching your network for a DeckBridge agent (about %1$d s)…</string>
     <string name="connect_no_hosts_yet">No computers found yet. Keep the PC agent running, stay on the same Wi‑Fi, or add one with a pairing QR.</string>
     <string name="connect_no_hosts_yet_add_host">No new computers found yet. Keep the desktop agent running, stay on the same Wi‑Fi, or scan a pairing QR to add one.</string>
-    <string name="connect_network_isolation_hint">If the router uses guest Wi‑Fi, client/AP isolation, or a separate “IoT” VLAN, phones often cannot reach PCs on the main LAN — even with correct IPs. Use the primary home network (not guest), disable client isolation if you can, or pair using QR / manual IP from the PC’s real subnet.</string>
+    <string name="connect_network_isolation_hint">If the router uses guest Wi‑Fi, client/AP isolation, or a separate "IoT" VLAN, phones often cannot reach PCs on the main LAN — even with correct IPs. Use the primary home network (not guest), disable client isolation if you can, or pair using QR / manual IP from the PC’s real subnet.</string>
     <string name="connect_gate_continue">Continue to deck without PC link</string>
     <string name="connect_scan_error">Scan issue: %1$s</string>
     <string name="connect_add_computer">Add computer</string>
@@ -443,7 +459,7 @@
     <string name="connect_help_title_add_host">Adding another computer</string>
     <string name="connect_help_body_add_host">1) Open the DeckBridge agent on the new Windows or Mac machine.\n2) Keep the phone on the same Wi‑Fi as that computer.\n3) Scan its pairing QR or choose it from the list, then approve the code in the agent console.\n\nYou can change the active host later in diagnostics; this screen adds a computer to link with this phone.</string>
     <string name="connect_help_close">Got it</string>
-    <string name="connect_pairing_title">Waiting on “%1$s”</string>
+    <string name="connect_pairing_title">Waiting on "%1$s"</string>
     <string name="connect_pairing_body">On the PC, approve this code in the DeckBridge agent (see agent console logs for the exact curl/command). The phone will connect automatically when the host accepts.</string>
     <string name="connect_pairing_body_add_host">You are linking an additional computer. On that machine, approve this code in the DeckBridge agent (see the agent console). Your existing deck links stay until you switch host.</string>
     <string name="connect_pairing_waiting_hint">Waiting for the computer to confirm…</string>
@@ -506,6 +522,7 @@
     <string name="settings_mac_channel_lan">Mac via LAN</string>
     <string name="settings_mac_channel_bridge">Mac Bridge (recommended)</string>
     <string name="settings_mac_channel_hint">Mac Bridge: Android as server, Mac connects outbound. Works through VPN.</string>
+    <string name="settings_mac_bridge_android_ip_label">Android WiFi IP (type this in the Mac agent  i &lt;ip&gt;  command)</string>
 
     <!-- Foreground service -->
     <string name="service_notification_title">DeckBridge activo</string>
@@ -525,4 +542,8 @@
     <string name="settings_accessibility_status_off">Inactivo — solo funciona con la app en primer plano</string>
     <string name="settings_accessibility_open">Abrir Accesibilidad del sistema</string>
     <string name="settings_accessibility_privacy_note">Privacidad: DeckBridge no lee texto ni contraseñas. Solo reenvía teclas de acceso rápido a tu PC vinculada cuando el deck está configurado.</string>
+    <string name="settings_keep_keyboard_awake_title">Mantener teclado encendido</string>
+    <string name="settings_keep_keyboard_awake_desc">Envía pings BLE periódicos para evitar que el teclado entre en suspensión por inactividad.</string>
+    <string name="settings_keep_keyboard_awake_experimental">⚠ Experimental · puede no funcionar en todos los modelos de teclado · aumenta el consumo de batería del teclado</string>
+    <string name="settings_section_keep_keyboard">Teclado Bluetooth</string>
 </resources>

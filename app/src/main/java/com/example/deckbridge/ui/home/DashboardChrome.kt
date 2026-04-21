@@ -2,6 +2,8 @@ package com.example.deckbridge.ui.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,12 +16,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.LaptopMac
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,17 +35,22 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.deckbridge.R
 import com.example.deckbridge.domain.model.AppState
 import com.example.deckbridge.domain.model.HostDeliveryChannel
 import com.example.deckbridge.domain.model.HostPlatform
+import com.example.deckbridge.domain.model.PhysicalKeyboardConnectionState
 import com.example.deckbridge.domain.model.PlatformSlotState
 
 @Composable
 fun DashboardTopChrome(
     state: AppState,
     onOpenSettings: () -> Unit,
+    onGoToConnect: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -48,7 +60,14 @@ fun DashboardTopChrome(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.End,
     ) {
-        ConnectionStatusDot(state = state)
+        ConnectionStatusPill(state = state, onGoToConnect = onGoToConnect)
+        val batteryLevel = state.physicalKeyboard
+            .takeIf { it.state == PhysicalKeyboardConnectionState.CONNECTED }
+            ?.batteryLevel
+        if (batteryLevel != null) {
+            Spacer(Modifier.width(6.dp))
+            KeyboardBatteryBadge(level = batteryLevel)
+        }
         Spacer(Modifier.width(10.dp))
         ChromeIconButton(onClick = onOpenSettings) {
             Icon(
@@ -78,6 +97,7 @@ fun DashboardLandscapeChrome(
     state: AppState,
     onOpenSettings: () -> Unit,
     onHostPlatformSelected: (HostPlatform) -> Unit,
+    onGoToConnect: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val effective = when (state.hostPlatform) {
@@ -95,7 +115,13 @@ fun DashboardLandscapeChrome(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            ConnectionStatusDot(state = state)
+            ConnectionStatusPill(state = state, onGoToConnect = onGoToConnect, compact = true)
+            val batteryLevel = state.physicalKeyboard
+                .takeIf { it.state == PhysicalKeyboardConnectionState.CONNECTED }
+                ?.batteryLevel
+            if (batteryLevel != null) {
+                KeyboardBatteryBadge(level = batteryLevel)
+            }
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -195,8 +221,18 @@ private fun ChromeIconButton(
     }
 }
 
+/**
+ * Tappable pill showing the current connection state with a colored dot and a text label.
+ * Tapping navigates to the connection screen.
+ *
+ * [compact] = true collapses the text label (landscape side-panel where vertical space is limited).
+ */
 @Composable
-private fun ConnectionStatusDot(state: AppState) {
+private fun ConnectionStatusPill(
+    state: AppState,
+    onGoToConnect: () -> Unit,
+    compact: Boolean = false,
+) {
     val channel = state.hostDeliveryChannel
     val lan = channel == HostDeliveryChannel.LAN
     val macBridge = channel == HostDeliveryChannel.MAC_BRIDGE
@@ -211,14 +247,13 @@ private fun ConnectionStatusDot(state: AppState) {
         macBridge && state.macBridgeClientAlive ->
             Color(0xFF2EE6A0) to stringResource(R.string.dash_mac_bridge_connected)
         macBridge && state.macBridgeServerRunning ->
-            Color(0xFFFFB020) to stringResource(R.string.dash_mac_bridge_waiting)
+            Color(0xFFFFB020) to stringResource(R.string.dash_mac_bridge_server_ready)
         macBridge ->
-            Color(0xFF5A5A68) to stringResource(R.string.dash_mac_bridge_waiting)
+            Color(0xFF5A5A68) to stringResource(R.string.dash_mac_bridge_inactive)
         !lan -> Color(0xFF5A5A68) to stringResource(R.string.dash_link_hid)
         !state.lanTrustOk -> Color(0xFFFF6B5A) to stringResource(R.string.dash_lan_trust)
         lan && hostBlank -> Color(0xFFFFB020) to stringResource(R.string.dash_lan_no_host)
         state.lanHealthOk == true -> Color(0xFF2EE6A0) to stringResource(R.string.dash_link_ready)
-        // #4: distinguish "retrying" from plain "offline"
         state.lanHealthOk == false && state.lanHealthRetrying ->
             Color(0xFFFFB020) to stringResource(R.string.dash_lan_retrying)
         state.lanHealthOk == false -> Color(0xFFFF6B5A) to stringResource(R.string.dash_lan_offline)
@@ -226,30 +261,111 @@ private fun ConnectionStatusDot(state: AppState) {
     }
 
     val detailLine = when {
-        // #6: action-failed feedback takes priority for 2.5 s
         state.lastActionFailed -> stringResource(R.string.dash_action_not_sent)
-        // #2: Mac Bridge queue drop warning
         state.macBridgeActionDropped -> stringResource(R.string.mac_bridge_action_dropped)
         macBridge && state.macBridgeClientAlive ->
             state.macBridgeClientIp ?: stringResource(R.string.dash_host_placeholder)
-        // #7: server running but no client yet — show port hint
         macBridge && state.macBridgeServerRunning ->
             stringResource(R.string.mac_bridge_server_port_hint)
-        macBridge -> stringResource(R.string.dash_mac_bridge_waiting)
+        macBridge -> stringResource(R.string.dash_mac_bridge_inactive)
         lan && state.lanHealthOk == false && detailShort != null -> detailShort
         else -> hostLine
     }
-    val a11yLabel = stringResource(
-        R.string.dash_connection_dot_a11y,
-        statusLabel,
-        detailLine,
-    )
+    val a11yLabel = stringResource(R.string.dash_connection_dot_a11y, statusLabel, detailLine)
 
+    // One-word label shown in the compact (landscape) pill: derived from dot color
+    // so it stays in sync without duplicating state logic.
+    val shortLabel = when (dotColor) {
+        Color(0xFF2EE6A0) -> stringResource(R.string.dash_status_short_online)
+        Color(0xFFFFB020) -> stringResource(R.string.dash_status_short_waiting)
+        Color(0xFFFF6B5A) -> stringResource(R.string.dash_status_short_offline)
+        else              -> stringResource(R.string.dash_status_short_inactive)
+    }
+
+    val interaction = remember { MutableInteractionSource() }
+    val pillModifier = Modifier
+        .clip(RoundedCornerShape(8.dp))
+        .background(Color.White.copy(alpha = 0.07f))
+        .clickable(
+            interactionSource = interaction,
+            indication = ripple(bounded = true),
+            onClick = onGoToConnect,
+        )
+        .semantics { contentDescription = a11yLabel }
+
+    val dot = @Composable {
+        Box(
+            Modifier
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(dotColor),
+        )
+    }
+
+    if (compact) {
+        // Landscape side-panel: dot stacked above a one-word status word.
+        // Panel width ~56 dp → 44 dp content area → fits "Waiting…" at 9 sp.
+        Column(
+            modifier = pillModifier.padding(horizontal = 8.dp, vertical = 6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            dot()
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = shortLabel,
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = androidx.compose.ui.unit.TextUnit(9f, androidx.compose.ui.unit.TextUnitType.Sp),
+                color = Color.White.copy(alpha = 0.65f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    } else {
+        // Portrait top-bar: dot + full status label in a row.
+        Row(
+            modifier = pillModifier.padding(horizontal = 8.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            dot()
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = statusLabel,
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.78f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/**
+ * Circular battery badge shown next to the connection pill when a Bluetooth keyboard is connected
+ * and battery level is available (API 31+).
+ *
+ * Color coding: green ≥ 50 %, amber 20–49 %, red < 20 %.
+ */
+@Composable
+internal fun KeyboardBatteryBadge(level: Int, modifier: Modifier = Modifier) {
+    val ringColor = when {
+        level >= 50 -> Color(0xFF2EE6A0)
+        level >= 20 -> Color(0xFFFFB020)
+        else -> Color(0xFFFF6B5A)
+    }
     Box(
-        modifier = Modifier
-            .size(14.dp)
+        modifier = modifier
+            .size(28.dp)
             .clip(CircleShape)
-            .background(dotColor)
-            .semantics { contentDescription = a11yLabel },
-    )
+            .background(Color.White.copy(alpha = 0.06f))
+            .border(1.5.dp, ringColor, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = "$level",
+            fontSize = 8.sp,
+            fontWeight = FontWeight.Bold,
+            color = ringColor,
+            maxLines = 1,
+        )
+    }
 }

@@ -7,25 +7,11 @@ enum class PhysicalKeyboardConnectionState {
     ERROR,
 }
 
-enum class HostUsbConnectionState {
-    /** No USB host session (future milestone). */
-    NOT_CONNECTED,
-    /** Cable present but handshake not done. */
-    ATTACHED_IDLE,
-    /** Ready to exchange actions with the desktop agent. */
-    READY,
-    ERROR,
-}
-
 data class PhysicalKeyboardStatus(
     val state: PhysicalKeyboardConnectionState,
     val deviceName: String?,
     val detail: String,
+    /** Battery level 0–100, or null when unavailable (API < 31 or device doesn't report). */
+    val batteryLevel: Int? = null,
 )
 
-data class HostConnectionStatus(
-    val usbState: HostUsbConnectionState,
-    /** Friendly name shown in UI until real discovery exists. */
-    val hostLabel: String,
-    val detail: String,
-)

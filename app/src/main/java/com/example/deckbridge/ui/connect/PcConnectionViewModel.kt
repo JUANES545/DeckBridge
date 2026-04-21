@@ -10,6 +10,7 @@ import com.example.deckbridge.R
 import com.example.deckbridge.data.repository.DeckBridgeRepository
 import com.example.deckbridge.domain.model.AppState
 import com.example.deckbridge.domain.model.HostDeliveryChannel
+import com.example.deckbridge.domain.model.HostPlatform
 import com.example.deckbridge.domain.model.LanAgentListScanState
 import com.example.deckbridge.domain.model.LanDiscoveredAgent
 import com.example.deckbridge.domain.pairing.DeckbridgePairingPayload
@@ -338,6 +339,19 @@ class PcConnectionViewModel(
     }
 
     private suspend fun beginQrPairing(ep: DeckbridgePairingPayload.Bootstrap) {
+        // MAC_BRIDGE fast path: token is embedded directly in the QR — no LAN HTTP needed.
+        // The Mac agent can't receive inbound connections (that's why we use MAC_BRIDGE),
+        // so skipping the LAN round-trip avoids the "always errors" failure.
+        if (ep.suggestedHostPlatform == HostPlatform.MAC && ep.bridgeToken != null) {
+            DeckBridgeLog.qr("MAC_BRIDGE direct token from QR — skipping LAN bootstrap")
+            _qrPhaseMessageRes.value = null
+            repository.applyMacBridgeToken(ep.bridgeToken)
+            _pairing.value = null
+            val popQr = emitQrNavigateOnPairingSuccess
+            emitQrNavigateOnPairingSuccess = false
+            if (popQr) _qrNavOut.tryEmit(Unit)
+            return
+        }
         ep.suggestedHostPlatform?.let { plat ->
             DeckBridgeLog.qr("deeplink os=… applying hostPlatform=$plat before LAN bootstrap")
             repository.syncHostPlatformForPairing(plat)

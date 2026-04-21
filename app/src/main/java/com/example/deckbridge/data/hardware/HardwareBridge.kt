@@ -35,6 +35,12 @@ private const val CALIB_VERSION = 2
 /** Mirror highlight duration — keep short for snappy Wi‑Fi debugging UX. */
 private const val HIGHLIGHT_MS = 240L
 private const val KNOB_PRESS_UP_MS = 115L
+/**
+ * Cooldown after a motion-calibration step advance.
+ * A single physical knob rotation fires many MotionEvent ticks (one per detent).
+ * Without a cooldown every tick would advance the wizard, skipping all directions.
+ */
+private const val MOTION_CALIB_COOLDOWN_MS = 1200L
 
 /** [MotionEvent.AXIS_HORIZONTAL_SCROLL] (value 10); use const for tooling that omits the field. */
 private const val MOTION_AXIS_HORIZONTAL_SCROLL = 10
@@ -84,6 +90,7 @@ class HardwareBridge(
 
     private var draft: CalibrationDraft? = null
     private var stepIndex: Int = 0
+    @Volatile private var motionCalibCooldownUntil: Long = 0L
 
     private sealed class Step {
         data class Pad(val row: Int, val col: Int) : Step()
@@ -124,6 +131,7 @@ class HardwareBridge(
     fun startCalibration() {
         draft = CalibrationDraft(deviceDescriptor = null)
         stepIndex = 0
+        motionCalibCooldownUntil = 0L
         DeckBridgeLog.cal("wizard started totalSteps=${steps.size} (9 pads + 3 knobs × (CCW+CW+press))")
         emitSession(lastCapture = null, error = null, forceShow = true)
     }
@@ -131,6 +139,7 @@ class HardwareBridge(
     fun cancelCalibration() {
         draft = null
         stepIndex = 0
+        motionCalibCooldownUntil = 0L
         _calibrationSession.value = null
         DeckBridgeLog.cal("wizard cancelled by user")
     }
@@ -312,6 +321,13 @@ class HardwareBridge(
                     d.deviceVendorId = snap.vendorId.takeIf { it != 0 }
                     d.deviceProductId = snap.productId.takeIf { it != 0 }
                 }
+                // Each physical rotation generates many MotionEvent ticks (one per detent).
+                // Only advance once per gesture; ignore ticks until the cooldown expires.
+                val now = System.currentTimeMillis()
+                if (now < motionCalibCooldownUntil) {
+                    return HardwareMotionHandleResult(rawLine, null, null, null)
+                }
+                motionCalibCooldownUntil = now + MOTION_CALIB_COOLDOWN_MS
                 advanceAfterCapture("Motion: $print")
                 return HardwareMotionHandleResult(rawLine, null, null, null)
             }

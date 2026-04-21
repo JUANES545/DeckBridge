@@ -21,7 +21,6 @@ private val Context.deckBridgeDataStore: DataStore<Preferences> by preferencesDa
 
 private val KEY_HOST_PLATFORM = stringPreferencesKey("host_platform")
 private val KEY_HOST_AUTO_DETECT = booleanPreferencesKey("host_auto_detect")
-private val KEY_HID_PC_MODE = booleanPreferencesKey("hid_pc_mode")
 private val KEY_HARDWARE_CALIBRATION_JSON = stringPreferencesKey("hardware_calibration_json")
 private val KEY_HOST_DELIVERY_CHANNEL = stringPreferencesKey("host_delivery_channel")
 /** Legacy single-host keys (pre–per-platform); migrated into [KEY_LAN_WIN_HOST] on first boot. */
@@ -74,17 +73,6 @@ suspend fun DataStore<Preferences>.readHostAutoDetect(): Boolean {
 suspend fun DataStore<Preferences>.writeHostAutoDetect(enabled: Boolean) {
     edit { prefs ->
         prefs[KEY_HOST_AUTO_DETECT] = enabled
-    }
-}
-
-/** Null = never set; first boot should default from [com.example.deckbridge.device.PrivilegedShellProbe]. */
-suspend fun DataStore<Preferences>.readHidPcModeOrNull(): Boolean? {
-    return data.map { it[KEY_HID_PC_MODE] }.first()
-}
-
-suspend fun DataStore<Preferences>.writeHidPcMode(enabled: Boolean) {
-    edit { prefs ->
-        prefs[KEY_HID_PC_MODE] = enabled
     }
 }
 
@@ -307,5 +295,17 @@ suspend fun DataStore<Preferences>.readAnimatedBackgroundTheme(): AnimatedBackgr
 suspend fun DataStore<Preferences>.writeAnimatedBackgroundTheme(theme: AnimatedBackgroundTheme) {
     edit { prefs ->
         prefs[KEY_ANIMATED_BACKGROUND_THEME] = theme.persisted()
+    }
+}
+
+private val KEY_KEEP_KEYBOARD_AWAKE = booleanPreferencesKey("keep_keyboard_awake")
+
+suspend fun DataStore<Preferences>.readKeepKeyboardAwake(): Boolean {
+    return data.map { it[KEY_KEEP_KEYBOARD_AWAKE] }.first() ?: false
+}
+
+suspend fun DataStore<Preferences>.writeKeepKeyboardAwake(enabled: Boolean) {
+    edit { prefs ->
+        prefs[KEY_KEEP_KEYBOARD_AWAKE] = enabled
     }
 }
