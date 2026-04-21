@@ -6,6 +6,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 **Language:** Changelog entries and pull request descriptions are written in **English**.
 
+## [1.4.0] - 2026-04-21
+
+### Added
+
+- **Mac Bridge — inverted architecture:** Android runs a lightweight HTTP server (port 8767); the Mac agent connects outbound to it, bypassing GlobalProtect and CrowdStrike which block all inbound TCP on corporate Macs. Transport auto-selection on each reconnect: ADB forward → saved IP → Tailscale peer → UDP broadcast (port 8766).
+- **In-app update flow:** `AppUpdateManager` handles APK download, verification, and silent installation via the Accessibility Service. `UpdateBanner` surfaces update availability in the dashboard.
+- **Platform slot management:** Separate credential slots for Windows (`lan_win_*`) and macOS (`lan_mac_*`) hosts in DataStore. QR pairing payload supports `os=mac` to route into the correct slot automatically. `PlatformSlotState` model tracks slot sync status.
+- **Screen always-on:** `FLAG_KEEP_SCREEN_ON` set in `MainActivity.onCreate` — display stays active while the app is in the foreground.
+- **Foreground service:** `DeckBridgeService` keeps LAN and Mac Bridge connections alive when the app moves to the background.
+- **Dashboard effects:** `DashboardAurora` and `DashboardParticles` animated background components; `AnimatedBackgroundTheme` model.
+- **LAN circuit breaker:** `LanCircuitBreaker` prevents repeated failed connection attempts.
+- **Accessibility service:** `DeckBridgeAccessibilityService` registered for update installation flow.
+- **Unit tests:** `HostDeliveryChannelTest`, `MacBridgeServerTest`, `ConnectionBannerLogicTest`.
+
+### Changed
+
+- **Onboarding:** `OnboardingFlow` restructured with revised copy and step layout.
+- **Settings:** `SettingsScreen` reorganized; Mac Bridge radio button shown only for macOS platform slot.
+- **Calibration:** `CalibrationScreen` expanded with additional feedback states.
+- **Navigation:** `DeckBridgeNavHost` extended for update flow and new destinations.
+- **Repository:** `DeckBridgeRepositoryImpl` expanded for Mac Bridge lifecycle, platform slot sync, LAN health merge, and update state management.
+- **Strings:** EN + ES resources updated for Mac Bridge UI states, update flow, and platform slot labels.
+
+### Removed
+
+- `HidTransportDispatcher`, `HidGadgetSession`, `HidKeyboardSender`, `HidMediaSender`, `HidConsumerUsages`, `HidKeyboardUsages` — HID gadget transport removed pending hardware availability.
+- `PrivilegedShellProbe` — privileged shell probe removed.
+- `HidDebugLineFormatter`, `HidTransportUiMapper` — HID debug helpers removed with transport layer.
+
 ## [1.3.0] - 2026-04-11
 
 ### Added
@@ -86,6 +115,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Initial public release: Jetpack Compose shell, release signing via `keystore.properties`, and project tooling.
 
+[1.4.0]: https://github.com/JUANES545/DeckBridge/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/JUANES545/DeckBridge/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/JUANES545/DeckBridge/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/JUANES545/DeckBridge/compare/v1.1.0...v1.1.1
