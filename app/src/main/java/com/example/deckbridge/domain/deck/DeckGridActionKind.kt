@@ -12,4 +12,6 @@ enum class DeckGridActionKind {
     NOOP,
     APP_LAUNCH,
     SCRIPT,
+    /** Local action: next/previous deck page (wraps around). Sub-option stored in intentId. */
+    PAGE_NAV,
 }

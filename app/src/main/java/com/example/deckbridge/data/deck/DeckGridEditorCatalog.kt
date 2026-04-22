@@ -19,7 +19,13 @@ object DeckGridEditorCatalog {
         DeckGridActionKind.KEY,
         DeckGridActionKind.COMBO,
         DeckGridActionKind.MEDIA,
+        DeckGridActionKind.PAGE_NAV,
         DeckGridActionKind.NOOP,
+    )
+
+    val pageNavOptions: List<DeckEditorIntentOption> = listOf(
+        DeckEditorIntentOption(R.string.grid_edit_page_nav_next, DeckButtonIntent.PageNav.Next.intentId),
+        DeckEditorIntentOption(R.string.grid_edit_page_nav_prev, DeckButtonIntent.PageNav.Prev.intentId),
     )
 
     val keyOptions: List<DeckEditorIntentOption> = listOf(
@@ -86,6 +92,15 @@ object DeckGridEditorCatalog {
                 intentId = DeckButtonIntent.SystemMedia.Mute.intentId,
                 iconToken = "volume_mute",
             )
+            DeckGridActionKind.PAGE_NAV -> DeckGridButtonPersisted(
+                id = "",
+                sortIndex = 0,
+                label = "",
+                subtitle = "",
+                kind = DeckGridActionKind.PAGE_NAV,
+                intentId = DeckButtonIntent.PageNav.Next.intentId,
+                iconToken = "next_track",
+            )
             DeckGridActionKind.NOOP,
             DeckGridActionKind.APP_LAUNCH,
             DeckGridActionKind.SCRIPT,
@@ -123,6 +138,8 @@ object DeckGridEditorCatalog {
                     ?: DeckButtonIntent.KeyboardChord.Paste.intentId
                 DeckGridActionKind.MEDIA -> base.intentId.takeIf { id -> mediaOptions.any { it.intentId == id } }
                     ?: DeckButtonIntent.SystemMedia.Mute.intentId
+                DeckGridActionKind.PAGE_NAV -> base.intentId.takeIf { id -> pageNavOptions.any { it.intentId == id } }
+                    ?: DeckButtonIntent.PageNav.Next.intentId
                 DeckGridActionKind.NOOP,
                 DeckGridActionKind.APP_LAUNCH,
                 DeckGridActionKind.SCRIPT,

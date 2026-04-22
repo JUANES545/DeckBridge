@@ -41,6 +41,8 @@ private val KEY_ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_complet
 private val KEY_SKIP_INITIAL_PC_CONNECT = booleanPreferencesKey("skip_initial_pc_connect")
 private val KEY_LAN_MOBILE_DEVICE_ID = stringPreferencesKey("lan_mobile_device_id")
 private val KEY_DECK_GRID_LAYOUT_JSON = stringPreferencesKey("deck_grid_layout_json")
+/** Multi-page format (schemaVersion 3). Supersedes [KEY_DECK_GRID_LAYOUT_JSON] after first migration. */
+private val KEY_DECK_PAGES_LAYOUT_JSON = stringPreferencesKey("deck_pages_layout_json")
 private val KEY_ANIMATED_BACKGROUND_MODE  = stringPreferencesKey("animated_background_mode")
 private val KEY_ANIMATED_BACKGROUND_THEME = stringPreferencesKey("animated_background_theme")
 
@@ -273,6 +275,16 @@ suspend fun DataStore<Preferences>.readDeckGridLayoutJson(): String? {
 suspend fun DataStore<Preferences>.writeDeckGridLayoutJson(json: String) {
     edit { prefs ->
         prefs[KEY_DECK_GRID_LAYOUT_JSON] = json
+    }
+}
+
+suspend fun DataStore<Preferences>.readDeckPagesLayoutJson(): String? {
+    return data.map { it[KEY_DECK_PAGES_LAYOUT_JSON] }.first()
+}
+
+suspend fun DataStore<Preferences>.writeDeckPagesLayoutJson(json: String) {
+    edit { prefs ->
+        prefs[KEY_DECK_PAGES_LAYOUT_JSON] = json
     }
 }
 

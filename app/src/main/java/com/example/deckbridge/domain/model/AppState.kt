@@ -52,6 +52,15 @@ data class AppState(
     /** Briefly true after a deck action could not be delivered to the host. Auto-clears. */
     val lastActionFailed: Boolean = false,
 
+    /** Index of the currently visible deck page (0-based). */
+    val activeDeckPageIndex: Int = 0,
+    /** Total number of deck pages available. */
+    val deckPageCount: Int = 1,
+    /** Macro buttons for every page (index = page index); empty list = only active page available. */
+    val deckPages: List<List<MacroButton>> = emptyList(),
+    /** Optional user-defined name per page (null = unnamed); index matches [deckPages]. */
+    val deckPageNames: List<String?> = emptyList(),
+
     // ── Per-slot connection state ─────────────────────────────────────────────
     /** Windows PC slot connection state (always LAN channel). */
     val windowsSlot: PlatformSlotState = PlatformSlotState(channel = HostDeliveryChannel.LAN),

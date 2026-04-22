@@ -60,6 +60,10 @@ object DeckGridEditValidator {
                     return R.string.grid_edit_err_type_payload
                 }
             }
+            DeckGridActionKind.PAGE_NAV -> {
+                val allowed = setOf(DeckButtonIntent.PageNav.Next.intentId, DeckButtonIntent.PageNav.Prev.intentId)
+                if (cell.intentId !in allowed) return R.string.grid_edit_err_type_payload
+            }
             DeckGridActionKind.APP_LAUNCH,
             DeckGridActionKind.SCRIPT,
             -> return R.string.grid_edit_err_reserved_kind

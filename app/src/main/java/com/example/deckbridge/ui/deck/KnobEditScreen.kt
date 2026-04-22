@@ -340,6 +340,19 @@ private fun KnobBindingSection(
                         onSelect = { viewModel.setBindingIntentId(binding, it) },
                     )
                 }
+                DeckGridActionKind.PAGE_NAV -> {
+                    IntentChoiceSectionKnob(
+                        sectionTitle = stringResource(R.string.grid_edit_page_nav_title),
+                        options = DeckGridEditorCatalog.pageNavOptions,
+                        selectedIntentId = action.intentId,
+                        onSelect = { viewModel.setBindingIntentId(binding, it) },
+                    )
+                    Text(
+                        text = stringResource(R.string.grid_edit_page_nav_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 DeckGridActionKind.NOOP -> {
                     Text(
                         text = stringResource(R.string.grid_edit_noop_desc),
@@ -391,6 +404,7 @@ private fun knobEditKindLabel(kind: DeckGridActionKind): String = when (kind) {
     DeckGridActionKind.KEY -> stringResource(R.string.grid_edit_kind_key)
     DeckGridActionKind.COMBO -> stringResource(R.string.grid_edit_kind_combo)
     DeckGridActionKind.MEDIA -> stringResource(R.string.grid_edit_kind_media)
+    DeckGridActionKind.PAGE_NAV -> stringResource(R.string.grid_edit_kind_page_nav)
     DeckGridActionKind.NOOP -> stringResource(R.string.grid_edit_kind_noop)
     DeckGridActionKind.APP_LAUNCH -> stringResource(R.string.grid_edit_kind_app_launch)
     DeckGridActionKind.SCRIPT -> stringResource(R.string.grid_edit_kind_script)

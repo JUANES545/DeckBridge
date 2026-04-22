@@ -190,6 +190,11 @@
     <string name="grid_edit_kind_noop">No action</string>
     <string name="grid_edit_kind_app_launch">Open app (coming soon)</string>
     <string name="grid_edit_kind_script">Script (coming soon)</string>
+    <string name="grid_edit_kind_page_nav">Page navigation</string>
+    <string name="grid_edit_page_nav_title">Direction</string>
+    <string name="grid_edit_page_nav_next">Next page →</string>
+    <string name="grid_edit_page_nav_prev">← Previous page</string>
+    <string name="grid_edit_page_nav_desc">Switches to the next or previous page on this device.</string>
     <string name="grid_edit_text_body">Text to type on the PC</string>
     <string name="grid_edit_key_title">Key</string>
     <string name="grid_edit_key_enter">Enter</string>

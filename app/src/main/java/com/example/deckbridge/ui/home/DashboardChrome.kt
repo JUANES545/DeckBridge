@@ -98,6 +98,7 @@ fun DashboardLandscapeChrome(
     onOpenSettings: () -> Unit,
     onHostPlatformSelected: (HostPlatform) -> Unit,
     onGoToConnect: () -> Unit = {},
+    pageIndicator: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val effective = when (state.hostPlatform) {
@@ -153,6 +154,10 @@ fun DashboardLandscapeChrome(
             }
         }
         Spacer(Modifier.weight(1f))
+        if (pageIndicator != null) {
+            pageIndicator()
+            Spacer(Modifier.height(8.dp))
+        }
         ChromeIconButton(onClick = onOpenSettings) {
             Icon(
                 Icons.Filled.Settings,

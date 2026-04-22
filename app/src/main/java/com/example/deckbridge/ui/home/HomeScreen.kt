@@ -24,15 +24,49 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.rounded.DragHandle
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import androidx.compose.material.icons.outlined.LaptopMac
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ripple
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,6 +79,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -87,12 +123,49 @@ fun HomeScreen(
     onUpdatePermissionTapped: () -> Unit = {},
     onInstallTapped: (android.net.Uri) -> Unit = {},
     onUpdateDismissed: () -> Unit = {},
+    onSetActivePage: (Int) -> Unit = {},
+    onAddPage: () -> Unit = {},
+    onDuplicatePage: () -> Unit = {},
+    onDeletePage: () -> Unit = {},
+    onReorderPage: (List<Int>) -> Unit = {},
+    onUpdatePageName: (index: Int, name: String?) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     val config = LocalConfiguration.current
     val landscape = config.orientation == Configuration.ORIENTATION_LANDSCAPE
     val surface = Color(0xFF050508)
-    val padSlots = remember(state.macroButtons) { mirrorPadSlots(state) }
+
+    // ── Page navigation state ─────────────────────────────────────────────────
+    val pageCount = state.deckPageCount.coerceAtLeast(1)
+    var displayedPage by rememberSaveable { mutableStateOf(state.activeDeckPageIndex.coerceIn(0, pageCount - 1)) }
+    // true = last change came from knob/dot/PAGE_NAV → use crossfade
+    // false = last change came from swipe gesture → use slide
+    var lastPageChangeProgrammatic by remember { mutableStateOf(false) }
+    var swipeDirection by remember { mutableStateOf(1) } // +1 → next, -1 → prev
+    val haptic = LocalHapticFeedback.current
+
+    // Programmatic page change (knob, PAGE_NAV, dot tap, page add/delete) → crossfade.
+    LaunchedEffect(state.activeDeckPageIndex) {
+        val target = state.activeDeckPageIndex.coerceIn(0, pageCount - 1)
+        if (displayedPage != target) {
+            lastPageChangeProgrammatic = true
+            displayedPage = target
+        }
+    }
+
+    // Persist swipe-driven changes to the repository + haptic tick on every page settle.
+    LaunchedEffect(displayedPage) {
+        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        if (displayedPage != state.activeDeckPageIndex) {
+            onSetActivePage(displayedPage)
+        }
+    }
+
+    // ── Page management sheet ─────────────────────────────────────────────────
+    var showPageSheet by rememberSaveable { mutableStateOf(false) }
+    val pageSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    val padSlots = remember(state.macroButtons) { mirrorPadSlotsFromButtons(state.macroButtons) }
     var bannerDismissed by rememberSaveable { mutableStateOf(false) }
     val showBanner = !bannerDismissed &&
         state.hostDeliveryChannel == HostDeliveryChannel.LAN && (
@@ -136,30 +209,78 @@ fun HomeScreen(
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .fillMaxHeight(),
+                            .fillMaxHeight()
+                            .pointerInput(pageCount) {
+                                val threshold = 80.dp.toPx()
+                                var accumulated = 0f
+                                detectHorizontalDragGestures(
+                                    onDragStart = { accumulated = 0f },
+                                    onDragEnd = { accumulated = 0f },
+                                    onDragCancel = { accumulated = 0f },
+                                    onHorizontalDrag = { change, dragAmount ->
+                                        change.consume()
+                                        accumulated += dragAmount
+                                        when {
+                                            accumulated < -threshold && displayedPage < pageCount - 1 -> {
+                                                lastPageChangeProgrammatic = false
+                                                swipeDirection = 1
+                                                displayedPage++
+                                                accumulated = 0f
+                                            }
+                                            accumulated > threshold && displayedPage > 0 -> {
+                                                lastPageChangeProgrammatic = false
+                                                swipeDirection = -1
+                                                displayedPage--
+                                                accumulated = 0f
+                                            }
+                                        }
+                                    },
+                                )
+                            },
                         contentAlignment = Alignment.Center,
                     ) {
-                        HardwareMirrorPanel(
-                            calibration = state.hardwareCalibration,
-                            highlight = state.hardwareMirrorHighlight,
-                            knobMirrorRotation = state.knobMirrorRotation,
-                            diagSummary = state.hardwareDiagSummary,
-                            padSlots = padSlots,
-                            deckKnobs = state.deckKnobs,
-                            hostPlatform = state.hostPlatform,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 2.dp),
-                            maxContentWidth = null,
-                            showKnobRoleHints = false,
-                            layoutDensity = MirrorLayoutDensity.DashboardLandscape,
-                            chrome = MirrorPanelChrome.Dashboard,
-                            deckHighlight = state.deckHighlight,
-                            onPadCellTapped = onDeckButtonTapped,
-                            onPadCellLongPress = onDeckButtonLongPress,
-                            onMirrorKnobTouchRotate = onMirrorKnobTouchRotate,
-                            onMirrorKnobLongPress = onMirrorKnobLongPress,
-                        )
+                        AnimatedContent(
+                            targetState = displayedPage,
+                            transitionSpec = {
+                                if (lastPageChangeProgrammatic) {
+                                    fadeIn(tween(80)) togetherWith fadeOut(tween(80))
+                                } else {
+                                    val dir = swipeDirection
+                                    slideInHorizontally(tween(220)) { w -> dir * w } togetherWith
+                                        slideOutHorizontally(tween(220)) { w -> -dir * w }
+                                }
+                            },
+                            label = "deck-page",
+                        ) { page ->
+                            val pageButtons = state.deckPages.getOrNull(page) ?: state.macroButtons
+                            val pagePadSlots = remember(pageButtons) { mirrorPadSlotsFromButtons(pageButtons) }
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                HardwareMirrorPanel(
+                                    calibration = state.hardwareCalibration,
+                                    highlight = state.hardwareMirrorHighlight,
+                                    knobMirrorRotation = state.knobMirrorRotation,
+                                    diagSummary = state.hardwareDiagSummary,
+                                    padSlots = pagePadSlots,
+                                    deckKnobs = state.deckKnobs,
+                                    hostPlatform = state.hostPlatform,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 2.dp),
+                                    maxContentWidth = null,
+                                    showKnobRoleHints = false,
+                                    layoutDensity = MirrorLayoutDensity.DashboardLandscape,
+                                    chrome = MirrorPanelChrome.Dashboard,
+                                    deckHighlight = state.deckHighlight,
+                                    onPadCellTapped = onDeckButtonTapped,
+                                    onPadCellLongPress = onDeckButtonLongPress,
+                                    onMirrorKnobTouchRotate = onMirrorKnobTouchRotate,
+                                    onMirrorKnobLongPress = onMirrorKnobLongPress,
+                                )
+                            }
+                        }
                         if (showUpdateBanner) {
                             UpdateBanner(
                                 updateState = updateState,
@@ -175,6 +296,15 @@ fun HomeScreen(
                         state = state,
                         onOpenSettings = onOpenSettings,
                         onHostPlatformSelected = onHostPlatformSelected,
+                        pageIndicator = {
+                            PageIndicatorDots(
+                                pageCount = pageCount,
+                                currentPage = displayedPage,
+                                onPageSelected = { page -> onSetActivePage(page) },
+                                onLongPress = { showPageSheet = true },
+                                isVertical = true,
+                            )
+                        },
                     )
                 }
             } else {
@@ -202,30 +332,87 @@ fun HomeScreen(
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .fillMaxWidth(),
+                            .fillMaxWidth()
+                            .pointerInput(pageCount) {
+                                val threshold = 80.dp.toPx()
+                                var accumulated = 0f
+                                detectHorizontalDragGestures(
+                                    onDragStart = { accumulated = 0f },
+                                    onDragEnd = { accumulated = 0f },
+                                    onDragCancel = { accumulated = 0f },
+                                    onHorizontalDrag = { change, dragAmount ->
+                                        change.consume()
+                                        accumulated += dragAmount
+                                        when {
+                                            accumulated < -threshold && displayedPage < pageCount - 1 -> {
+                                                lastPageChangeProgrammatic = false
+                                                swipeDirection = 1
+                                                displayedPage++
+                                                accumulated = 0f
+                                            }
+                                            accumulated > threshold && displayedPage > 0 -> {
+                                                lastPageChangeProgrammatic = false
+                                                swipeDirection = -1
+                                                displayedPage--
+                                                accumulated = 0f
+                                            }
+                                        }
+                                    },
+                                )
+                            },
                         contentAlignment = Alignment.Center,
                     ) {
-                        HardwareMirrorPanel(
-                            calibration = state.hardwareCalibration,
-                            highlight = state.hardwareMirrorHighlight,
-                            knobMirrorRotation = state.knobMirrorRotation,
-                            diagSummary = state.hardwareDiagSummary,
-                            padSlots = padSlots,
-                            deckKnobs = state.deckKnobs,
-                            hostPlatform = state.hostPlatform,
-                            modifier = Modifier.fillMaxWidth(),
-                            maxContentWidth = null,
-                            showKnobRoleHints = false,
-                            layoutDensity = MirrorLayoutDensity.DashboardPortrait,
-                            chrome = MirrorPanelChrome.Dashboard,
-                            deckHighlight = state.deckHighlight,
-                            onPadCellTapped = onDeckButtonTapped,
-                            onPadCellLongPress = onDeckButtonLongPress,
-                            onMirrorKnobTouchRotate = onMirrorKnobTouchRotate,
-                            onMirrorKnobLongPress = onMirrorKnobLongPress,
-                        )
+                        AnimatedContent(
+                            targetState = displayedPage,
+                            transitionSpec = {
+                                if (lastPageChangeProgrammatic) {
+                                    fadeIn(tween(80)) togetherWith fadeOut(tween(80))
+                                } else {
+                                    val dir = swipeDirection
+                                    slideInHorizontally(tween(220)) { w -> dir * w } togetherWith
+                                        slideOutHorizontally(tween(220)) { w -> -dir * w }
+                                }
+                            },
+                            label = "deck-page",
+                        ) { page ->
+                            val pageButtons = state.deckPages.getOrNull(page) ?: state.macroButtons
+                            val pagePadSlots = remember(pageButtons) { mirrorPadSlotsFromButtons(pageButtons) }
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                HardwareMirrorPanel(
+                                    calibration = state.hardwareCalibration,
+                                    highlight = state.hardwareMirrorHighlight,
+                                    knobMirrorRotation = state.knobMirrorRotation,
+                                    diagSummary = state.hardwareDiagSummary,
+                                    padSlots = pagePadSlots,
+                                    deckKnobs = state.deckKnobs,
+                                    hostPlatform = state.hostPlatform,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    maxContentWidth = null,
+                                    showKnobRoleHints = false,
+                                    layoutDensity = MirrorLayoutDensity.DashboardPortrait,
+                                    chrome = MirrorPanelChrome.Dashboard,
+                                    deckHighlight = state.deckHighlight,
+                                    onPadCellTapped = onDeckButtonTapped,
+                                    onPadCellLongPress = onDeckButtonLongPress,
+                                    onMirrorKnobTouchRotate = onMirrorKnobTouchRotate,
+                                    onMirrorKnobLongPress = onMirrorKnobLongPress,
+                                )
+                            }
+                        }
                     }
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(6.dp))
+                    PageIndicatorDots(
+                        pageCount = pageCount,
+                        currentPage = displayedPage,
+                        onPageSelected = { page -> onSetActivePage(page) },
+                        onLongPress = { showPageSheet = true },
+                        isVertical = false,
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                    )
+                    Spacer(Modifier.height(6.dp))
                     PlatformSegmentedControl(
                         selected = state.hostPlatform,
                         onSelect = onHostPlatformSelected,
@@ -246,6 +433,348 @@ fun HomeScreen(
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
+        }
+        if (showPageSheet) {
+            PageManagementSheet(
+                sheetState = pageSheetState,
+                pageCount = pageCount,
+                currentPage = displayedPage,
+                onDismiss = { showPageSheet = false },
+                onAddPage = {
+                    showPageSheet = false
+                    onAddPage()
+                },
+                onDuplicatePage = {
+                    showPageSheet = false
+                    onDuplicatePage()
+                },
+                onDeletePage = {
+                    showPageSheet = false
+                    onDeletePage()
+                },
+                onReorderPage = onReorderPage,
+                pageNames = state.deckPageNames,
+                onUpdatePageName = onUpdatePageName,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PageManagementSheet(
+    sheetState: androidx.compose.material3.SheetState,
+    pageCount: Int,
+    currentPage: Int,
+    onDismiss: () -> Unit,
+    onAddPage: () -> Unit,
+    onDuplicatePage: () -> Unit,
+    onDeletePage: () -> Unit,
+    onReorderPage: (List<Int>) -> Unit,
+    pageNames: List<String?> = emptyList(),
+    onUpdatePageName: (index: Int, name: String?) -> Unit = { _, _ -> },
+) {
+    val canAdd = pageCount < com.example.deckbridge.domain.deck.DeckPagesPersisted.MAX_PAGES
+    val canDelete = pageCount > 1
+    val sheetBg = Color(0xFF12121C)
+
+    // ── Drag-to-reorder state ─────────────────────────────────────────────────
+    val pageItems = remember(pageCount) { androidx.compose.runtime.snapshots.SnapshotStateList<Int>().also { list ->
+        repeat(pageCount) { list.add(it) }
+    }}
+    val lazyListState = rememberLazyListState()
+    val reorderState = rememberReorderableLazyListState(lazyListState) { from, to ->
+        // Only move page rows (Int keys); ignore header/footer (String keys)
+        if (from.key is Int && to.key is Int) {
+            val fromIdx = pageItems.indexOf(from.key as Int)
+            val toIdx = pageItems.indexOf(to.key as Int)
+            if (fromIdx >= 0 && toIdx >= 0) pageItems.add(toIdx, pageItems.removeAt(fromIdx))
+        }
+    }
+
+    // ── Inline rename state ───────────────────────────────────────────────────
+    var editingPageIdx by remember { mutableStateOf<Int?>(null) }
+    var editingNameText by remember { mutableStateOf("") }
+    val focusManager = LocalFocusManager.current
+    val commitEdit: () -> Unit = {
+        val idx = editingPageIdx
+        if (idx != null) {
+            val clean = editingNameText.ifBlank { null }
+            if (clean != pageNames.getOrNull(idx)?.ifBlank { null }) onUpdatePageName(idx, clean)
+            editingPageIdx = null
+        }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = sheetBg,
+        dragHandle = {
+            Box(
+                Modifier
+                    .padding(top = 12.dp, bottom = 8.dp)
+                    .size(width = 36.dp, height = 4.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(Color.White.copy(alpha = 0.22f)),
+            )
+        },
+    ) {
+        // Single LazyColumn for the entire sheet: header + page rows (reorderable) + action footer.
+        // This lets the sheet scroll naturally in landscape without nested-scroll conflicts.
+        LazyColumn(
+            state = lazyListState,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            // ── Header ───────────────────────────────────────────────────────
+            item(key = "header") {
+                Column(Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "Pages",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White.copy(alpha = 0.90f),
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                    )
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                }
+            }
+
+            // ── Draggable page rows ───────────────────────────────────────────
+            items(pageItems.toList(), key = { it }) { pageIdx ->
+                ReorderableItem(reorderState, key = pageIdx) { isDragging ->
+                    val isActive = pageIdx == currentPage
+                    val rowBg = when {
+                        isDragging -> Color(0xFF1E1E2E)
+                        isActive   -> Color.White.copy(alpha = 0.04f)
+                        else       -> Color.Transparent
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(rowBg)
+                            .padding(start = 20.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (isActive) Color(0xFF3D62FF)
+                                    else Color.White.copy(alpha = 0.12f)
+                                ),
+                        )
+                        Spacer(Modifier.width(14.dp))
+                        val displayName = pageNames.getOrNull(pageIdx)?.ifBlank { null }
+                        val isEditing = editingPageIdx == pageIdx
+                        val focusRequester = remember { FocusRequester() }
+                        // True only after the field has actually received focus — prevents
+                        // onFocusChanged(false) on first composition from calling commitEdit().
+                        var wasFocused by remember { mutableStateOf(false) }
+                        LaunchedEffect(isEditing) {
+                            if (isEditing) {
+                                kotlinx.coroutines.delay(80)
+                                try { focusRequester.requestFocus() } catch (_: Exception) { }
+                            } else {
+                                wasFocused = false
+                            }
+                        }
+                        if (isEditing) {
+                            // ── Inline text field ─────────────────────────────
+                            BasicTextField(
+                                value = editingNameText,
+                                onValueChange = { editingNameText = it },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(
+                                    capitalization = KeyboardCapitalization.Sentences,
+                                    imeAction = ImeAction.Done,
+                                ),
+                                keyboardActions = KeyboardActions(
+                                    onDone = { commitEdit(); focusManager.clearFocus() },
+                                ),
+                                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                    fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                                    color = Color.White.copy(alpha = 0.90f),
+                                ),
+                                cursorBrush = SolidColor(Color(0xFF3D62FF)),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .focusRequester(focusRequester)
+                                    .onFocusChanged { fs ->
+                                        if (fs.isFocused) wasFocused = true
+                                        else if (wasFocused) { wasFocused = false; commitEdit() }
+                                    },
+                                decorationBox = { innerTextField ->
+                                    Column(Modifier.fillMaxWidth()) {
+                                        Box(Modifier.padding(bottom = 3.dp)) {
+                                            if (editingNameText.isEmpty()) {
+                                                Text(
+                                                    text = "Name this page…",
+                                                    style = MaterialTheme.typography.bodyLarge,
+                                                    color = Color.White.copy(alpha = 0.25f),
+                                                )
+                                            }
+                                            innerTextField()
+                                        }
+                                        Box(
+                                            Modifier
+                                                .fillMaxWidth()
+                                                .height(1.5.dp)
+                                                .background(Color(0xFF3D62FF).copy(alpha = 0.70f)),
+                                        )
+                                    }
+                                },
+                            )
+                        } else {
+                            // ── Tappable name display ─────────────────────────
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .pointerInput(pageIdx) {
+                                        detectTapGestures(onTap = {
+                                            editingNameText = pageNames.getOrNull(pageIdx) ?: ""
+                                            editingPageIdx = pageIdx
+                                        })
+                                    },
+                            ) {
+                                Text(
+                                    text = displayName ?: "Page ${pageIdx + 1}",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                                    color = Color.White.copy(alpha = if (isActive) 0.90f else 0.60f),
+                                )
+                                if (displayName != null) {
+                                    Text(
+                                        text = "Page ${pageIdx + 1}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color.White.copy(alpha = 0.30f),
+                                    )
+                                } else {
+                                    Text(
+                                        text = "Tap to name",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color.White.copy(alpha = 0.22f),
+                                    )
+                                }
+                            }
+                        }
+                        if (pageCount > 1) {
+                            IconButton(
+                                onClick = {},
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .draggableHandle(
+                                        onDragStopped = {
+                                            val newOrder = pageItems.toList()
+                                            val original = (0 until pageCount).toList()
+                                            if (newOrder != original) onReorderPage(newOrder)
+                                        },
+                                    ),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.DragHandle,
+                                    contentDescription = "Reorder page",
+                                    tint = Color.White.copy(alpha = 0.35f),
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Action footer ─────────────────────────────────────────────────
+            item(key = "footer") {
+                Column(Modifier.fillMaxWidth()) {
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                    Spacer(Modifier.height(4.dp))
+                    SheetActionRow(
+                        icon = Icons.Outlined.Add,
+                        label = "Add page",
+                        subtitle = if (canAdd) "Page ${pageCount + 1} of ${com.example.deckbridge.domain.deck.DeckPagesPersisted.MAX_PAGES} max"
+                                   else "Maximum ${com.example.deckbridge.domain.deck.DeckPagesPersisted.MAX_PAGES} pages reached",
+                        enabled = canAdd,
+                        onClick = onAddPage,
+                    )
+                    SheetActionRow(
+                        icon = Icons.Outlined.ContentCopy,
+                        label = "Duplicate this page",
+                        subtitle = if (canAdd) "Copy inserted after current page"
+                                   else "Maximum ${com.example.deckbridge.domain.deck.DeckPagesPersisted.MAX_PAGES} pages reached",
+                        enabled = canAdd,
+                        onClick = onDuplicatePage,
+                    )
+                    SheetActionRow(
+                        icon = Icons.Outlined.Delete,
+                        label = "Delete this page",
+                        subtitle = if (canDelete) "Current page will be removed"
+                                   else "Can't delete the only page",
+                        enabled = canDelete,
+                        isDestructive = true,
+                        onClick = onDeletePage,
+                    )
+                    Spacer(Modifier.height(32.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SheetActionRow(
+    icon: ImageVector,
+    label: String,
+    subtitle: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    isDestructive: Boolean = false,
+    modifier: Modifier = Modifier,
+) {
+    val contentAlpha = if (enabled) 1f else 0.35f
+    val iconColor = when {
+        !enabled -> Color.White.copy(alpha = contentAlpha)
+        isDestructive -> Color(0xFFFF6B5A)
+        else -> Color(0xFF3D62FF)
+    }
+    val interaction = remember { MutableInteractionSource() }
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(
+                interactionSource = interaction,
+                indication = ripple(bounded = true),
+                enabled = enabled,
+                onClick = onClick,
+            )
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(iconColor.copy(alpha = if (enabled) 0.12f else 0.06f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = iconColor,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        Spacer(Modifier.width(16.dp))
+        Column {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+                color = Color.White.copy(alpha = if (enabled) 0.90f else 0.35f),
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = if (enabled) 0.48f else 0.25f),
+            )
         }
     }
 }
@@ -341,8 +870,8 @@ private fun NoConnectionBanner(
     }
 }
 
-private fun mirrorPadSlots(state: AppState) =
-    state.macroButtons
+private fun mirrorPadSlotsFromButtons(buttons: List<com.example.deckbridge.domain.model.MacroButton>) =
+    buttons
         .sortedBy { it.sortIndex }
         .map { btn ->
             MirrorPadSlot(

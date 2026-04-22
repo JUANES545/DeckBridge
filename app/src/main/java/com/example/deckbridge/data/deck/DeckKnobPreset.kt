@@ -65,6 +65,7 @@ object DeckKnobPreset {
         is DeckButtonIntent.SingleKey -> DeckGridActionKind.KEY
         is DeckButtonIntent.KeyboardChord -> DeckGridActionKind.COMBO
         is DeckButtonIntent.SystemMedia -> DeckGridActionKind.MEDIA
+        is DeckButtonIntent.PageNav -> DeckGridActionKind.PAGE_NAV
         is DeckButtonIntent.Noop -> DeckGridActionKind.NOOP
     }
 }

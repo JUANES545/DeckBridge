@@ -4,7 +4,9 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
 import com.example.deckbridge.data.repository.DeckBridgeRepository
+import kotlinx.coroutines.launch
 import com.example.deckbridge.domain.model.AnimatedBackgroundMode
 import com.example.deckbridge.domain.model.AnimatedBackgroundTheme
 import com.example.deckbridge.domain.model.AppState
@@ -93,6 +95,30 @@ class MainViewModel(
 
     fun setKeepKeyboardAwake(enabled: Boolean) {
         repository.setKeepKeyboardAwake(enabled)
+    }
+
+    fun setActiveDeckPage(index: Int) {
+        viewModelScope.launch { repository.setActiveDeckPage(index) }
+    }
+
+    fun addDeckPage() {
+        viewModelScope.launch { repository.addDeckPage() }
+    }
+
+    fun duplicateDeckPage(index: Int) {
+        viewModelScope.launch { repository.duplicateDeckPage(index) }
+    }
+
+    fun reorderDeckPages(newOrder: List<Int>) {
+        viewModelScope.launch { repository.reorderDeckPages(newOrder) }
+    }
+
+    fun updateDeckPageName(index: Int, name: String?) {
+        viewModelScope.launch { repository.updateDeckPageName(index, name) }
+    }
+
+    fun deleteDeckPage(index: Int) {
+        viewModelScope.launch { repository.deleteDeckPage(index) }
     }
 
     companion object {

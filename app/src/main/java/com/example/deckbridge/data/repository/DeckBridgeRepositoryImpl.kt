@@ -33,6 +33,8 @@ import com.example.deckbridge.data.preferences.writeKeepKeyboardAwake
 import com.example.deckbridge.data.preferences.readAnimatedBackgroundMode
 import com.example.deckbridge.data.preferences.readAnimatedBackgroundTheme
 import com.example.deckbridge.data.preferences.readDeckGridLayoutJson
+import com.example.deckbridge.data.preferences.readDeckPagesLayoutJson
+import com.example.deckbridge.data.preferences.writeDeckPagesLayoutJson
 import com.example.deckbridge.data.preferences.readHardwareCalibrationJson
 import com.example.deckbridge.data.preferences.readHostAutoDetect
 import com.example.deckbridge.data.preferences.readHostDeliveryChannel
@@ -67,6 +69,8 @@ import com.example.deckbridge.domain.deck.DeckGridLayoutPersisted
 import com.example.deckbridge.domain.deck.DeckKnobActionPersisted
 import com.example.deckbridge.domain.deck.DeckKnobPersisted
 import com.example.deckbridge.domain.deck.DeckKnobsLayoutPersisted
+import com.example.deckbridge.domain.deck.DeckMultiPageSurface
+import com.example.deckbridge.domain.deck.DeckPagesPersisted
 import com.example.deckbridge.domain.deck.DeckPersistedSurface
 import com.example.deckbridge.domain.hardware.CalibrationSessionUi
 import com.example.deckbridge.domain.hardware.HardwareControlId
@@ -264,8 +268,8 @@ class DeckBridgeRepositoryImpl(
         externalScope.launch {
             // Load persisted deck surface first so the UI reflects the user's layout ASAP.
             // Previously done via runBlocking() on the calling thread (ANR risk on slow storage).
-            val surface = withContext(Dispatchers.IO) { loadPersistedSurfaceOrSeed() }
-            applyPersistedSurfaceToAppState(surface)
+            val surface = withContext(Dispatchers.IO) { loadPersistedMultiPageOrSeed() }
+            applyMultiPageSurfaceToAppState(surface)
             bootstrapLanSettings()
             bootstrapAnimatedBackground()
             attemptLanUdpDiscoveryAndHealth()
@@ -569,6 +573,18 @@ class DeckBridgeRepositoryImpl(
         }
     }
 
+    /** Wrapping page advance: delta=+1 for next, -1 for prev. */
+    private fun advancePage(delta: Int) {
+        val state = _appState.value
+        val count = state.deckPageCount.coerceAtLeast(1)
+        val next = ((state.activeDeckPageIndex + delta) % count + count) % count
+        // Optimistic: flip the index immediately — deckPages is already in memory,
+        // so the UI responds in the next frame without waiting for DataStore I/O.
+        _appState.update { it.copy(activeDeckPageIndex = next) }
+        // Persist async; also updates macroButtons / physicalBindings for the new active page.
+        externalScope.launch { setActiveDeckPage(next) }
+    }
+
     private fun tryDispatchKnobFromHardware(
         intent: DeckButtonIntent?,
         keyEvent: KeyEvent?,
@@ -583,6 +599,12 @@ class DeckBridgeRepositoryImpl(
             val now = SystemClock.elapsedRealtime()
             if (now - lastKnobMotionRealtime[motionKnobIndex] < KNOB_MOTION_THROTTLE_MS) return
             lastKnobMotionRealtime[motionKnobIndex] = now
+        }
+        // Page navigation is local — never sent to the host.
+        if (intent is DeckButtonIntent.PageNav) {
+            DeckBridgeLog.knob("match=$interactionKind idx=${knobIndexForLog ?: motionKnobIndex} intent=${intent.intentId}")
+            advancePage(if (intent is DeckButtonIntent.PageNav.Next) 1 else -1)
+            return
         }
         val snapshot = _appState.value
         val resolved = PlatformActionResolver.resolve(intent, snapshot.hostPlatform)
@@ -1731,6 +1753,12 @@ class DeckBridgeRepositoryImpl(
             }
         }
 
+        // Page navigation is local — never sent to the host.
+        if (button.intent is DeckButtonIntent.PageNav) {
+            advancePage(if (button.intent is DeckButtonIntent.PageNav.Next) 1 else -1)
+            return
+        }
+
         externalScope.launch {
             val result = runCatching { actionDispatcher.dispatch(resolved) }
             val failed = result.getOrNull()?.isFailure == true || result.isFailure
@@ -1893,8 +1921,8 @@ class DeckBridgeRepositoryImpl(
     }
 
     override suspend fun getDeckGridButton(buttonId: String): DeckGridButtonPersisted? = withContext(Dispatchers.IO) {
-        val raw = dataStore.readDeckGridLayoutJson() ?: return@withContext null
-        DeckGridLayoutJson.decode(raw, res)?.grid?.buttons?.find { it.id == buttonId }
+        val raw = dataStore.readDeckPagesLayoutJson() ?: return@withContext null
+        DeckGridLayoutJson.decodeMultiPage(raw, res)?.pages?.activePage?.buttons?.find { it.id == buttonId }
     }
 
     override suspend fun updateDeckGridButton(cell: DeckGridButtonPersisted): Result<Unit> = withContext(Dispatchers.IO) {
@@ -1902,11 +1930,11 @@ class DeckBridgeRepositoryImpl(
             DeckGridEditValidator.validate(cell)?.let { rid ->
                 throw IllegalArgumentException(app.getString(rid))
             }
-            val raw = dataStore.readDeckGridLayoutJson()
+            val raw = dataStore.readDeckPagesLayoutJson()
                 ?: throw IllegalStateException(app.getString(R.string.grid_edit_err_no_persisted_grid))
-            val surface = DeckGridLayoutJson.decode(raw, res)
+            val surface = DeckGridLayoutJson.decodeMultiPage(raw, res)
                 ?: throw IllegalStateException(app.getString(R.string.grid_edit_err_corrupt_grid))
-            if (surface.grid.buttons.none { it.id == cell.id }) {
+            if (surface.pages.activePage.buttons.none { it.id == cell.id }) {
                 throw IllegalArgumentException(app.getString(R.string.grid_edit_err_unknown_button))
             }
             val normalizedIcon = cell.iconToken?.trim()?.takeIf { it.isNotEmpty() }
@@ -1915,11 +1943,17 @@ class DeckBridgeRepositoryImpl(
                 subtitle = cell.subtitle.trim(),
                 iconToken = normalizedIcon,
             )
-            val replaced = surface.grid.buttons.map { if (it.id == toWrite.id) toWrite else it }
-            val next = surface.copy(grid = DeckGridLayoutPersisted(replaced))
-            dataStore.writeDeckGridLayoutJson(DeckGridLayoutJson.encode(next))
-            applyPersistedSurfaceToAppState(next)
-            DeckBridgeLog.state("deck grid: updated cell id=${cell.id} kind=${cell.kind}")
+            val updatedGrid = DeckGridLayoutPersisted(
+                surface.pages.activePage.buttons.map { if (it.id == toWrite.id) toWrite else it }
+            )
+            val updatedPages = surface.pages.pages.toMutableList()
+                .also { it[surface.pages.activePageIndex] = updatedGrid }
+            val next = surface.copy(
+                pages = surface.pages.copy(pages = updatedPages)
+            )
+            dataStore.writeDeckPagesLayoutJson(DeckGridLayoutJson.encodeMultiPage(next))
+            applyMultiPageSurfaceToAppState(next)
+            DeckBridgeLog.state("deck grid: updated cell id=${cell.id} kind=${cell.kind} page=${surface.pages.activePageIndex}")
         }
     }
 
@@ -1927,24 +1961,28 @@ class DeckBridgeRepositoryImpl(
         runCatching {
             val presetCell = DeckGridPreset.defaultLayoutFromResources(res).buttons.find { it.id == buttonId }
                 ?: throw IllegalArgumentException(app.getString(R.string.grid_edit_err_unknown_button))
-            val raw = dataStore.readDeckGridLayoutJson()
+            val raw = dataStore.readDeckPagesLayoutJson()
                 ?: throw IllegalStateException(app.getString(R.string.grid_edit_err_no_persisted_grid))
-            val surface = DeckGridLayoutJson.decode(raw, res)
+            val surface = DeckGridLayoutJson.decodeMultiPage(raw, res)
                 ?: throw IllegalStateException(app.getString(R.string.grid_edit_err_corrupt_grid))
-            val current = surface.grid.buttons.find { it.id == buttonId }
+            val current = surface.pages.activePage.buttons.find { it.id == buttonId }
                 ?: throw IllegalArgumentException(app.getString(R.string.grid_edit_err_unknown_button))
             val merged = presetCell.copy(sortIndex = current.sortIndex)
-            val replaced = surface.grid.buttons.map { if (it.id == buttonId) merged else it }
-            val next = surface.copy(grid = DeckGridLayoutPersisted(replaced))
-            dataStore.writeDeckGridLayoutJson(DeckGridLayoutJson.encode(next))
-            applyPersistedSurfaceToAppState(next)
-            DeckBridgeLog.state("deck grid: reset cell id=$buttonId to factory preset")
+            val updatedGrid = DeckGridLayoutPersisted(
+                surface.pages.activePage.buttons.map { if (it.id == buttonId) merged else it }
+            )
+            val updatedPages = surface.pages.pages.toMutableList()
+                .also { it[surface.pages.activePageIndex] = updatedGrid }
+            val next = surface.copy(pages = surface.pages.copy(pages = updatedPages))
+            dataStore.writeDeckPagesLayoutJson(DeckGridLayoutJson.encodeMultiPage(next))
+            applyMultiPageSurfaceToAppState(next)
+            DeckBridgeLog.state("deck grid: reset cell id=$buttonId to factory preset page=${surface.pages.activePageIndex}")
         }
     }
 
     override suspend fun getDeckKnob(knobId: String): DeckKnobPersisted? = withContext(Dispatchers.IO) {
-        val raw = dataStore.readDeckGridLayoutJson() ?: return@withContext null
-        DeckGridLayoutJson.decode(raw, res)?.knobs?.knobs?.find { it.id == knobId }
+        val raw = dataStore.readDeckPagesLayoutJson() ?: return@withContext null
+        DeckGridLayoutJson.decodeMultiPage(raw, res)?.knobs?.knobs?.find { it.id == knobId }
     }
 
     override suspend fun updateDeckKnob(knob: DeckKnobPersisted): Result<Unit> = withContext(Dispatchers.IO) {
@@ -1952,9 +1990,9 @@ class DeckBridgeRepositoryImpl(
             DeckKnobEditValidator.validate(knob)?.let { rid ->
                 throw IllegalArgumentException(app.getString(rid))
             }
-            val raw = dataStore.readDeckGridLayoutJson()
+            val raw = dataStore.readDeckPagesLayoutJson()
                 ?: throw IllegalStateException(app.getString(R.string.grid_edit_err_no_persisted_grid))
-            val surface = DeckGridLayoutJson.decode(raw, res)
+            val surface = DeckGridLayoutJson.decodeMultiPage(raw, res)
                 ?: throw IllegalStateException(app.getString(R.string.grid_edit_err_corrupt_grid))
             if (surface.knobs.knobs.none { it.id == knob.id }) {
                 throw IllegalArgumentException(app.getString(R.string.knob_edit_err_unknown_knob))
@@ -1962,8 +2000,8 @@ class DeckBridgeRepositoryImpl(
             val toWrite = normalizeKnobForPersist(knob)
             val replaced = surface.knobs.knobs.map { if (it.id == toWrite.id) toWrite else it }
             val next = surface.copy(knobs = DeckKnobsLayoutPersisted(replaced))
-            dataStore.writeDeckGridLayoutJson(DeckGridLayoutJson.encode(next))
-            applyPersistedSurfaceToAppState(next)
+            dataStore.writeDeckPagesLayoutJson(DeckGridLayoutJson.encodeMultiPage(next))
+            applyMultiPageSurfaceToAppState(next)
             DeckBridgeLog.state("deck knob: updated id=${knob.id}")
         }
     }
@@ -1972,9 +2010,9 @@ class DeckBridgeRepositoryImpl(
         runCatching {
             val presetKnob = DeckKnobPreset.defaultKnobsFromResources(res).knobs.find { it.id == knobId }
                 ?: throw IllegalArgumentException(app.getString(R.string.knob_edit_err_unknown_knob))
-            val raw = dataStore.readDeckGridLayoutJson()
+            val raw = dataStore.readDeckPagesLayoutJson()
                 ?: throw IllegalStateException(app.getString(R.string.grid_edit_err_no_persisted_grid))
-            val surface = DeckGridLayoutJson.decode(raw, res)
+            val surface = DeckGridLayoutJson.decodeMultiPage(raw, res)
                 ?: throw IllegalStateException(app.getString(R.string.grid_edit_err_corrupt_grid))
             val current = surface.knobs.knobs.find { it.id == knobId }
                 ?: throw IllegalArgumentException(app.getString(R.string.knob_edit_err_unknown_knob))
@@ -1984,64 +2022,207 @@ class DeckBridgeRepositoryImpl(
             )
             val replaced = surface.knobs.knobs.map { if (it.id == knobId) merged else it }
             val next = surface.copy(knobs = DeckKnobsLayoutPersisted(replaced))
-            dataStore.writeDeckGridLayoutJson(DeckGridLayoutJson.encode(next))
-            applyPersistedSurfaceToAppState(next)
+            dataStore.writeDeckPagesLayoutJson(DeckGridLayoutJson.encodeMultiPage(next))
+            applyMultiPageSurfaceToAppState(next)
             DeckBridgeLog.state("deck knob: reset id=$knobId to factory preset")
         }
     }
 
-    private fun applyPersistedSurfaceToAppState(surface: DeckPersistedSurface) {
+    private fun applyMultiPageSurfaceToAppState(surface: DeckMultiPageSurface) {
         hardwareBridge.setDeckKnobsLayout(surface.knobs)
         val host = _appState.value.hostPlatform
+        val activeGrid = surface.pages.activePage
         val macros = DeckGridDisplay.applyResolvedShortcuts(
-            DeckGridMacroMapper.toMacroButtons(surface.grid),
+            DeckGridMacroMapper.toMacroButtons(activeGrid),
             host,
             res,
         )
-        val bindings = DeckCatalog.physicalBindingsForFKeys(host, surface.grid.sortedButtons().map { it.id })
+        val allPages = surface.pages.pages.map { grid ->
+            DeckGridDisplay.applyResolvedShortcuts(DeckGridMacroMapper.toMacroButtons(grid), host, res)
+        }
+        val bindings = DeckCatalog.physicalBindingsForFKeys(host, activeGrid.sortedButtons().map { it.id })
         _appState.update { prev ->
             prev.copy(
                 macroButtons = macros,
                 physicalBindingsPreview = bindings,
                 deckKnobs = surface.knobs,
+                activeDeckPageIndex = surface.pages.activePageIndex,
+                deckPageCount = surface.pages.pages.size,
+                deckPages = allPages,
+                deckPageNames = surface.pages.pages.map { it.name },
             )
         }
     }
 
-    private suspend fun loadPersistedSurfaceOrSeed(): DeckPersistedSurface {
-        val raw = dataStore.readDeckGridLayoutJson()
-        if (raw.isNullOrBlank()) {
-            val grid = DeckGridPreset.defaultLayoutFromResources(res)
-            val knobs = DeckKnobPreset.defaultKnobsFromResources(res)
-            val surface = DeckPersistedSurface(
-                schemaVersion = DeckPersistedSurface.CURRENT_SCHEMA_VERSION,
-                grid = grid,
-                knobs = knobs,
+    private suspend fun loadPersistedMultiPageOrSeed(): DeckMultiPageSurface {
+        // 1. Try the new multi-page key first.
+        val newRaw = dataStore.readDeckPagesLayoutJson()
+        if (!newRaw.isNullOrBlank()) {
+            val decoded = DeckGridLayoutJson.decodeMultiPage(newRaw, res)
+            if (decoded != null) {
+                DeckBridgeLog.state("deck pages: loaded ${decoded.pages.pages.size} page(s) schema=${decoded.schemaVersion}")
+                return decoded
+            }
+            DeckBridgeLog.state("deck pages: new key corrupt — falling back to legacy key")
+        }
+
+        // 2. Migrate from legacy single-grid key (deck_grid_layout_json).
+        val legacyRaw = dataStore.readDeckGridLayoutJson()
+        if (!legacyRaw.isNullOrBlank()) {
+            val legacySurface = DeckGridLayoutJson.decode(legacyRaw, res)
+            if (legacySurface != null) {
+                val surface = DeckMultiPageSurface(
+                    pages = DeckPagesPersisted(listOf(legacySurface.grid), activePageIndex = 0),
+                    knobs = legacySurface.knobs,
+                )
+                dataStore.writeDeckPagesLayoutJson(DeckGridLayoutJson.encodeMultiPage(surface))
+                DeckBridgeLog.state("deck pages: migrated legacy single-grid to multi-page format")
+                return surface
+            }
+        }
+
+        // 3. Seed factory defaults.
+        val grid = DeckGridPreset.defaultLayoutFromResources(res)
+        val knobs = DeckKnobPreset.defaultKnobsFromResources(res)
+        val surface = DeckMultiPageSurface(
+            pages = DeckPagesPersisted(listOf(grid), activePageIndex = 0),
+            knobs = knobs,
+        )
+        dataStore.writeDeckPagesLayoutJson(DeckGridLayoutJson.encodeMultiPage(surface))
+        DeckBridgeLog.state("deck pages: seeded factory default (${grid.buttons.size} cells + knobs)")
+        return surface
+    }
+
+    // ── Page management ──────────────────────────────────────────────────────
+
+    override suspend fun addDeckPage(): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val raw = dataStore.readDeckPagesLayoutJson()
+                ?: throw IllegalStateException(app.getString(R.string.grid_edit_err_no_persisted_grid))
+            val surface = DeckGridLayoutJson.decodeMultiPage(raw, res)
+                ?: throw IllegalStateException(app.getString(R.string.grid_edit_err_corrupt_grid))
+            if (surface.pages.pages.size >= DeckPagesPersisted.MAX_PAGES) return@runCatching
+            val emptyGrid = buildEmptyPageGrid()
+            val newPages = surface.pages.pages + emptyGrid
+            val newActiveIndex = newPages.size - 1
+            val next = surface.copy(
+                pages = DeckPagesPersisted(pages = newPages, activePageIndex = newActiveIndex)
             )
-            dataStore.writeDeckGridLayoutJson(DeckGridLayoutJson.encode(surface))
-            DeckBridgeLog.state("deck grid: seeded default preset (${grid.buttons.size} cells + knobs)")
-            return surface
+            dataStore.writeDeckPagesLayoutJson(DeckGridLayoutJson.encodeMultiPage(next))
+            applyMultiPageSurfaceToAppState(next)
+            DeckBridgeLog.state("deck pages: added page (total=${next.pages.pages.size})")
         }
-        val migrateKnobs = DeckGridLayoutJson.surfaceMissingKnobsSection(raw)
-        val decoded = DeckGridLayoutJson.decode(raw, res)
-        if (decoded == null) {
-            DeckBridgeLog.state("deck grid: JSON corrupt or incompatible — reset to default preset")
-            val grid = DeckGridPreset.defaultLayoutFromResources(res)
-            val knobs = DeckKnobPreset.defaultKnobsFromResources(res)
-            val surface = DeckPersistedSurface(
-                schemaVersion = DeckPersistedSurface.CURRENT_SCHEMA_VERSION,
-                grid = grid,
-                knobs = knobs,
+    }
+
+    override suspend fun duplicateDeckPage(index: Int): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val raw = dataStore.readDeckPagesLayoutJson()
+                ?: throw IllegalStateException(app.getString(R.string.grid_edit_err_no_persisted_grid))
+            val surface = DeckGridLayoutJson.decodeMultiPage(raw, res)
+                ?: throw IllegalStateException(app.getString(R.string.grid_edit_err_corrupt_grid))
+            if (surface.pages.pages.size >= DeckPagesPersisted.MAX_PAGES) return@runCatching
+            val sourcePage = surface.pages.pages.getOrNull(index) ?: return@runCatching
+            val prefix = UUID.randomUUID().toString().replace("-", "").take(8)
+            val clonedButtons = sourcePage.sortedButtons().mapIndexed { i, btn ->
+                btn.copy(id = "btn_${prefix}_$i")
+            }
+            val clonedPage = DeckGridLayoutPersisted(clonedButtons)
+            val newPages = surface.pages.pages.toMutableList().also { it.add(index + 1, clonedPage) }
+            val next = surface.copy(
+                pages = DeckPagesPersisted(pages = newPages, activePageIndex = index + 1)
             )
-            dataStore.writeDeckGridLayoutJson(DeckGridLayoutJson.encode(surface))
-            return surface
+            dataStore.writeDeckPagesLayoutJson(DeckGridLayoutJson.encodeMultiPage(next))
+            applyMultiPageSurfaceToAppState(next)
+            DeckBridgeLog.state("deck pages: duplicated page $index → ${index + 1} (total=${next.pages.pages.size})")
         }
-        if (migrateKnobs) {
-            dataStore.writeDeckGridLayoutJson(DeckGridLayoutJson.encode(decoded))
-            DeckBridgeLog.state("deck surface: migrated knobs into persisted JSON")
+    }
+
+    override suspend fun reorderDeckPages(newOrder: List<Int>): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val raw = dataStore.readDeckPagesLayoutJson()
+                ?: throw IllegalStateException(app.getString(R.string.grid_edit_err_no_persisted_grid))
+            val surface = DeckGridLayoutJson.decodeMultiPage(raw, res)
+                ?: throw IllegalStateException(app.getString(R.string.grid_edit_err_corrupt_grid))
+            val pages = surface.pages.pages
+            if (newOrder.size != pages.size || newOrder.toSet() != pages.indices.toSet()) return@runCatching
+            val reordered = newOrder.map { pages[it] }
+            val oldActive = surface.pages.activePageIndex
+            val newActive = newOrder.indexOf(oldActive).coerceAtLeast(0)
+            val next = surface.copy(
+                pages = DeckPagesPersisted(pages = reordered, activePageIndex = newActive)
+            )
+            dataStore.writeDeckPagesLayoutJson(DeckGridLayoutJson.encodeMultiPage(next))
+            applyMultiPageSurfaceToAppState(next)
+            DeckBridgeLog.state("deck pages: reordered $newOrder (active $oldActive → $newActive)")
         }
-        DeckBridgeLog.state("deck grid: loaded persisted layout schema=${decoded.schemaVersion}")
-        return decoded
+    }
+
+    override suspend fun updateDeckPageName(index: Int, name: String?): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val raw = dataStore.readDeckPagesLayoutJson()
+                ?: throw IllegalStateException(app.getString(R.string.grid_edit_err_no_persisted_grid))
+            val surface = DeckGridLayoutJson.decodeMultiPage(raw, res)
+                ?: throw IllegalStateException(app.getString(R.string.grid_edit_err_corrupt_grid))
+            if (index !in surface.pages.pages.indices) return@runCatching
+            val cleanName = name?.ifBlank { null }
+            if (surface.pages.pages[index].name == cleanName) return@runCatching
+            val updatedPages = surface.pages.pages.mapIndexed { i, grid ->
+                if (i == index) grid.copy(name = cleanName) else grid
+            }
+            val next = surface.copy(pages = surface.pages.copy(pages = updatedPages))
+            dataStore.writeDeckPagesLayoutJson(DeckGridLayoutJson.encodeMultiPage(next))
+            applyMultiPageSurfaceToAppState(next)
+            DeckBridgeLog.state("deck pages: renamed page $index → '${cleanName ?: "<unnamed>"}'")
+        }
+    }
+
+    override suspend fun deleteDeckPage(index: Int): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val raw = dataStore.readDeckPagesLayoutJson()
+                ?: throw IllegalStateException(app.getString(R.string.grid_edit_err_no_persisted_grid))
+            val surface = DeckGridLayoutJson.decodeMultiPage(raw, res)
+                ?: throw IllegalStateException(app.getString(R.string.grid_edit_err_corrupt_grid))
+            if (surface.pages.pages.size <= 1) return@runCatching
+            val newPages = surface.pages.pages.toMutableList().also { it.removeAt(index) }
+            val newActiveIndex = surface.pages.activePageIndex.coerceAtMost(newPages.size - 1)
+            val next = surface.copy(
+                pages = DeckPagesPersisted(pages = newPages, activePageIndex = newActiveIndex)
+            )
+            dataStore.writeDeckPagesLayoutJson(DeckGridLayoutJson.encodeMultiPage(next))
+            applyMultiPageSurfaceToAppState(next)
+            DeckBridgeLog.state("deck pages: deleted page $index (total=${next.pages.pages.size})")
+        }
+    }
+
+    override suspend fun setActiveDeckPage(index: Int) {
+        withContext(Dispatchers.IO) {
+            val raw = dataStore.readDeckPagesLayoutJson() ?: return@withContext
+            val surface = DeckGridLayoutJson.decodeMultiPage(raw, res) ?: return@withContext
+            if (index !in surface.pages.pages.indices) return@withContext
+            val next = surface.copy(pages = surface.pages.copy(activePageIndex = index))
+            dataStore.writeDeckPagesLayoutJson(DeckGridLayoutJson.encodeMultiPage(next))
+            applyMultiPageSurfaceToAppState(next)
+            DeckBridgeLog.state("deck pages: switched to page $index")
+        }
+    }
+
+    private fun buildEmptyPageGrid(): DeckGridLayoutPersisted {
+        val prefix = java.util.UUID.randomUUID().toString().replace("-", "").take(8)
+        val buttons = (0 until DeckGridLayoutPersisted.GRID_SLOT_COUNT).map { i ->
+            DeckGridButtonPersisted(
+                id = "btn_${prefix}_$i",
+                sortIndex = i,
+                label = "",
+                subtitle = "",
+                kind = DeckGridActionKind.NOOP,
+                intentId = "deck.intent.noop",
+                payload = emptyMap(),
+                iconToken = null,
+                enabled = true,
+                visible = true,
+            )
+        }
+        return DeckGridLayoutPersisted(buttons)
     }
 
     private fun normalizeKnobForPersist(knob: DeckKnobPersisted): DeckKnobPersisted {
