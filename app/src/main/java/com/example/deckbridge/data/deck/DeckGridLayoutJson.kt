@@ -7,6 +7,8 @@ import com.example.deckbridge.domain.deck.DeckGridLayoutPersisted
 import com.example.deckbridge.domain.deck.DeckKnobActionPersisted
 import com.example.deckbridge.domain.deck.DeckKnobPersisted
 import com.example.deckbridge.domain.deck.DeckKnobsLayoutPersisted
+import com.example.deckbridge.domain.deck.DeckMultiPageSurface
+import com.example.deckbridge.domain.deck.DeckPagesPersisted
 import com.example.deckbridge.domain.deck.DeckPersistedSurface
 import org.json.JSONArray
 import org.json.JSONObject
@@ -14,6 +16,8 @@ import org.json.JSONObject
 private const val KEY_SCHEMA = "schemaVersion"
 private const val KEY_GRID = "grid"
 private const val KEY_KNOBS = "knobs"
+private const val KEY_PAGES = "pages"
+private const val KEY_ACTIVE_PAGE = "activePageIndex"
 private const val KEY_BUTTONS = "buttons"
 private const val KEY_ROTATE_CCW = "rotateCcw"
 private const val KEY_ROTATE_CW = "rotateCw"
@@ -28,6 +32,7 @@ private const val KEY_PAYLOAD = "payload"
 private const val KEY_ICON = "iconToken"
 private const val KEY_ENABLED = "enabled"
 private const val KEY_VISIBLE = "visible"
+private const val KEY_PAGE_NAME = "name"
 
 object DeckGridLayoutJson {
 
@@ -63,7 +68,9 @@ object DeckGridLayoutJson {
         grid.sortedButtons().forEach { b ->
             arr.put(buttonToJson(b))
         }
-        return JSONObject().put(KEY_BUTTONS, arr)
+        val obj = JSONObject().put(KEY_BUTTONS, arr)
+        if (!grid.name.isNullOrBlank()) obj.put(KEY_PAGE_NAME, grid.name)
+        return obj
     }
 
     private fun knobsToJson(layout: DeckKnobsLayoutPersisted): JSONArray {
@@ -176,7 +183,8 @@ object DeckGridLayoutJson {
             }
         }
         val normalized = raw.sortedBy { it.sortIndex }.mapIndexed { idx, b -> b.copy(sortIndex = idx) }
-        return runCatching { DeckGridLayoutPersisted(normalized) }.getOrNull()
+        val name = obj.optString(KEY_PAGE_NAME).ifBlank { null }
+        return runCatching { DeckGridLayoutPersisted(normalized, name = name) }.getOrNull()
     }
 
     private fun buttonFromJson(o: JSONObject): DeckGridButtonPersisted? {
@@ -220,4 +228,58 @@ object DeckGridLayoutJson {
             ?: DeckGridActionKind.entries.firstOrNull { it.name.equals(trimmed, ignoreCase = true) }
             ?: DeckGridActionKind.NOOP
     }
+
+    // ── Multi-page encode / decode ────────────────────────────────────────────
+
+    fun encodeMultiPage(surface: DeckMultiPageSurface): String {
+        val root = JSONObject()
+        root.put(KEY_SCHEMA, surface.schemaVersion)
+        root.put(KEY_ACTIVE_PAGE, surface.pages.activePageIndex)
+        val pagesArr = JSONArray()
+        surface.pages.pages.forEach { grid -> pagesArr.put(gridToJson(grid)) }
+        root.put(KEY_PAGES, pagesArr)
+        root.put(KEY_KNOBS, knobsToJson(surface.knobs))
+        return root.toString()
+    }
+
+    /**
+     * Decodes the multi-page format (schemaVersion 3).
+     * If the JSON is the legacy single-grid format (has "grid" key, no "pages" key), migrates it
+     * automatically by wrapping the existing grid as page 0.
+     */
+    fun decodeMultiPage(json: String, res: Resources): DeckMultiPageSurface? = runCatching {
+        val root = JSONObject(json)
+        val defaultKnobs = DeckKnobPreset.defaultKnobsFromResources(res)
+        val knobsJson = root.optJSONArray(KEY_KNOBS)
+        val knobs = knobsFromJson(knobsJson) ?: defaultKnobs
+
+        // Legacy single-grid migration: wrap existing grid as page 0.
+        if (!root.has(KEY_PAGES) && root.has(KEY_GRID)) {
+            val gridObj = root.getJSONObject(KEY_GRID)
+            val grid = gridFromJson(gridObj) ?: return@runCatching null
+            val pages = DeckPagesPersisted(pages = listOf(grid), activePageIndex = 0)
+            return@runCatching DeckMultiPageSurface(
+                schemaVersion = DeckMultiPageSurface.CURRENT_SCHEMA_VERSION,
+                pages = pages,
+                knobs = knobs,
+            )
+        }
+
+        val pagesArr = root.optJSONArray(KEY_PAGES) ?: return@runCatching null
+        if (pagesArr.length() == 0) return@runCatching null
+        val grids = buildList {
+            for (i in 0 until pagesArr.length()) {
+                val obj = pagesArr.optJSONObject(i) ?: return@runCatching null
+                add(gridFromJson(obj) ?: return@runCatching null)
+            }
+        }
+        val activePageIndex = root.optInt(KEY_ACTIVE_PAGE, 0)
+            .coerceIn(0, grids.size - 1)
+        val pages = DeckPagesPersisted(pages = grids, activePageIndex = activePageIndex)
+        DeckMultiPageSurface(
+            schemaVersion = DeckMultiPageSurface.CURRENT_SCHEMA_VERSION,
+            pages = pages,
+            knobs = knobs,
+        )
+    }.getOrNull()
 }

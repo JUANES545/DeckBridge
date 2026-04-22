@@ -25,7 +25,7 @@ object DeckKnobEditValidator {
         val synthetic = DeckGridButtonPersisted(
             id = "_knob_binding",
             sortIndex = 0,
-            label = " ",
+            label = "_",  // non-blank placeholder; knob actions have no label requirement
             subtitle = "",
             kind = action.kind,
             intentId = action.intentId,

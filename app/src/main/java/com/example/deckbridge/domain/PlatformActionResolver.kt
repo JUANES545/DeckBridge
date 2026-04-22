@@ -135,6 +135,20 @@ object PlatformActionResolver {
                 p = p,
                 label = "Media · Mute",
             )
+            is DeckButtonIntent.PageNav.Next -> ResolvedAction(
+                intentId = intent.intentId,
+                intentDisplayName = "Next page",
+                platform = p,
+                shortcutDisplay = "Page →",
+                kind = ResolvedActionKind.NOOP,
+            )
+            is DeckButtonIntent.PageNav.Prev -> ResolvedAction(
+                intentId = intent.intentId,
+                intentDisplayName = "Prev page",
+                platform = p,
+                shortcutDisplay = "Page ←",
+                kind = ResolvedActionKind.NOOP,
+            )
             DeckButtonIntent.Noop -> ResolvedAction(
                 intentId = intent.intentId,
                 intentDisplayName = "No-op",

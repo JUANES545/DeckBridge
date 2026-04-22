@@ -274,6 +274,20 @@ private fun GridEditActionAndIconSection(
                 onSelect = { viewModel.setIntentId(it) },
             )
         }
+        DeckGridActionKind.PAGE_NAV -> {
+            IntentChoiceCards(
+                sectionTitle = stringResource(R.string.grid_edit_page_nav_title),
+                options = DeckGridEditorCatalog.pageNavOptions,
+                selectedIntentId = d.intentId,
+                onSelect = { viewModel.setIntentId(it) },
+            )
+            Text(
+                text = stringResource(R.string.grid_edit_page_nav_desc),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 4.dp),
+            )
+        }
         DeckGridActionKind.NOOP -> {
             Text(
                 text = stringResource(R.string.grid_edit_noop_desc),
@@ -648,6 +662,7 @@ private fun kindIcon(kind: DeckGridActionKind) = when (kind) {
     DeckGridActionKind.KEY -> Icons.Filled.Keyboard
     DeckGridActionKind.COMBO -> Icons.Filled.TouchApp
     DeckGridActionKind.MEDIA -> Icons.Filled.Audiotrack
+    DeckGridActionKind.PAGE_NAV -> Icons.AutoMirrored.Filled.ArrowBack
     DeckGridActionKind.NOOP -> Icons.Filled.DoNotTouch
     DeckGridActionKind.APP_LAUNCH,
     DeckGridActionKind.SCRIPT,
@@ -660,6 +675,7 @@ private fun kindLabel(kind: DeckGridActionKind): String = when (kind) {
     DeckGridActionKind.KEY -> stringResource(R.string.grid_edit_kind_key)
     DeckGridActionKind.COMBO -> stringResource(R.string.grid_edit_kind_combo)
     DeckGridActionKind.MEDIA -> stringResource(R.string.grid_edit_kind_media)
+    DeckGridActionKind.PAGE_NAV -> stringResource(R.string.grid_edit_kind_page_nav)
     DeckGridActionKind.NOOP -> stringResource(R.string.grid_edit_kind_noop)
     DeckGridActionKind.APP_LAUNCH -> stringResource(R.string.grid_edit_kind_app_launch)
     DeckGridActionKind.SCRIPT -> stringResource(R.string.grid_edit_kind_script)

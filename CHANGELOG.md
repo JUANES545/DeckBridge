@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 **Language:** Changelog entries and pull request descriptions are written in **English**.
 
+## [1.5.0] - 2026-04-22
+
+### Added
+
+- **PAGE_NAV action kind:** New `DeckGridActionKind.PAGE_NAV` with `DeckButtonIntent.PageNav.Next` / `PageNav.Prev` intents. Grid buttons and knob bindings can now navigate between deck pages. Codec, validator, editor catalog, and preset factory updated to support it.
+- **Haptic feedback on page change:** A subtle tick (`HapticFeedbackType.TextHandleMove`) fires each time the deck settles on a new page.
+
+### Changed
+
+- **Page transitions — AnimatedContent:** Replaced `HorizontalPager` with `AnimatedContent` + `detectHorizontalDragGestures`. Programmatic page changes (knob, PAGE_NAV button, dot tap) use a 80 ms crossfade; manual swipes use a 220 ms directional slide.
+- **Optimistic page advance:** `advancePage()` in `DeckBridgeRepositoryImpl` now updates `_appState` immediately before launching the async DataStore write, eliminating the visible freeze on low-end devices when switching pages via knob.
+
+### Fixed
+
+- `DeckKnobEditValidator`: knob action synthetic label changed from blank to `"_"` so the reused `DeckGridEditValidator` path no longer rejects valid knob bindings with a false label-empty error.
+
 ## [1.4.0] - 2026-04-21
 
 ### Added
@@ -115,6 +131,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Initial public release: Jetpack Compose shell, release signing via `keystore.properties`, and project tooling.
 
+[1.5.0]: https://github.com/JUANES545/DeckBridge/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/JUANES545/DeckBridge/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/JUANES545/DeckBridge/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/JUANES545/DeckBridge/compare/v1.1.1...v1.2.0

@@ -118,6 +118,12 @@ fun DeckBridgeNavHost(
                         launchSingleTop = true
                     }
                 },
+                onSetActivePage = viewModel::setActiveDeckPage,
+                onAddPage = viewModel::addDeckPage,
+                onDuplicatePage = { viewModel.duplicateDeckPage(state.activeDeckPageIndex) },
+                onDeletePage = { viewModel.deleteDeckPage(state.activeDeckPageIndex) },
+                onReorderPage = viewModel::reorderDeckPages,
+                onUpdatePageName = { index, name -> viewModel.updateDeckPageName(index, name) },
             )
         }
         composable(DeckBridgeDestinations.SETTINGS) {

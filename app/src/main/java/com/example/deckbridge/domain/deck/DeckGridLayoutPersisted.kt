@@ -3,6 +3,8 @@ package com.example.deckbridge.domain.deck
 /** Persisted 3×3 macro grid. */
 data class DeckGridLayoutPersisted(
     val buttons: List<DeckGridButtonPersisted>,
+    /** Optional user-defined label for this page (e.g. "Gaming", "Editing"). Null = unnamed. */
+    val name: String? = null,
 ) {
     init {
         require(buttons.size == GRID_SLOT_COUNT) {

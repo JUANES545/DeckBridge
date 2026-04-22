@@ -198,6 +198,27 @@ interface DeckBridgeRepository {
     /** Replaces one cell with the factory preset for the same id (keeps [DeckGridButtonPersisted.sortIndex]). */
     suspend fun resetDeckGridButtonToDefault(buttonId: String): Result<Unit>
 
+    /** Adds a new empty page at the end of the page list and switches to it. No-op if already at [DeckPagesPersisted.MAX_PAGES]. */
+    suspend fun addDeckPage(): Result<Unit>
+
+    /** Duplicates the page at [index], inserts the copy right after it, and switches to the copy. No-op at [DeckPagesPersisted.MAX_PAGES]. */
+    suspend fun duplicateDeckPage(index: Int): Result<Unit>
+
+    /**
+     * Reorders the page list according to [newOrder], a full permutation of [0, pageCount).
+     * The active page follows its content (i.e. tracks its original index through the permutation).
+     */
+    suspend fun reorderDeckPages(newOrder: List<Int>): Result<Unit>
+
+    /** Sets (or clears) the optional display name for the page at [index]. */
+    suspend fun updateDeckPageName(index: Int, name: String?): Result<Unit>
+
+    /** Deletes the page at [index]. No-op if only one page exists. Adjusts [AppState.activeDeckPageIndex] if needed. */
+    suspend fun deleteDeckPage(index: Int): Result<Unit>
+
+    /** Switches to page [index] without modifying any button data. */
+    suspend fun setActiveDeckPage(index: Int)
+
     /** Loads one knob from persisted deck JSON for the knob editor. */
     suspend fun getDeckKnob(knobId: String): DeckKnobPersisted?
 

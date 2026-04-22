@@ -17,6 +17,10 @@ object DeckGridIntentCodec {
             DeckGridActionKind.SCRIPT,
             DeckGridActionKind.NOOP,
             -> return DeckButtonIntent.Noop
+            DeckGridActionKind.PAGE_NAV -> return when (button.intentId) {
+                DeckButtonIntent.PageNav.Prev.intentId -> DeckButtonIntent.PageNav.Prev
+                else -> DeckButtonIntent.PageNav.Next
+            }
             else -> Unit
         }
         return intentFromId(button.intentId, button.payload) ?: DeckButtonIntent.Noop
@@ -59,6 +63,8 @@ object DeckGridIntentCodec {
         DeckButtonIntent.SystemMedia.PreviousTrack.intentId -> DeckButtonIntent.SystemMedia.PreviousTrack
         DeckButtonIntent.SystemMedia.NextTrack.intentId -> DeckButtonIntent.SystemMedia.NextTrack
         DeckButtonIntent.SystemMedia.Mute.intentId -> DeckButtonIntent.SystemMedia.Mute
+        DeckButtonIntent.PageNav.Next.intentId -> DeckButtonIntent.PageNav.Next
+        DeckButtonIntent.PageNav.Prev.intentId -> DeckButtonIntent.PageNav.Prev
         DeckButtonIntent.Noop.intentId -> DeckButtonIntent.Noop
         else -> null
     }

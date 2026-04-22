@@ -83,6 +83,16 @@ sealed class DeckButtonIntent {
         }
     }
 
+    /** Local deck-page navigation — never sent to the host. */
+    sealed class PageNav : DeckButtonIntent() {
+        data object Next : PageNav() {
+            override val intentId: String = "deck.intent.page.next"
+        }
+        data object Prev : PageNav() {
+            override val intentId: String = "deck.intent.page.prev"
+        }
+    }
+
     /** Placeholder / reserved actions; host delivery treats as no-op. */
     data object Noop : DeckButtonIntent() {
         override val intentId: String = "deck.intent.noop"
