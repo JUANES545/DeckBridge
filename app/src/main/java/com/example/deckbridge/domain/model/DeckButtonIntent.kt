@@ -93,6 +93,15 @@ sealed class DeckButtonIntent {
         }
     }
 
+    /**
+     * Switches the Mac default audio output to [uid].
+     * Mac-only; dispatched as `{"type":"audio_output_select","uid":"..."}`.
+     * No-op if delivered to a Windows agent.
+     */
+    data class AudioOutputSelect(val uid: String, val deviceName: String) : DeckButtonIntent() {
+        override val intentId: String = "deck.intent.audio.output_select"
+    }
+
     /** Placeholder / reserved actions; host delivery treats as no-op. */
     data object Noop : DeckButtonIntent() {
         override val intentId: String = "deck.intent.noop"

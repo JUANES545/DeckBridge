@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 **Language:** Changelog entries and pull request descriptions are written in **English**.
 
+## [1.6.0] - 2026-04-23
+
+### Added
+
+- **Audio Outputs page:** Synthetic last deck page built from `macSlot.audioOutputs`. Displays available macOS output devices as buttons; tapping one sends an `AUDIO_OUTPUT_SELECT` action through the Mac Bridge to switch the system audio output. The page is never persisted — it is rebuilt on every state update from the Mac agent.
+- **`AUDIO_OUTPUT_SELECT` action kind:** New `DeckGridActionKind`, `DeckButtonIntent.AudioOutputSelect`, and `ResolvedActionKind.AUDIO_OUTPUT_SELECT`. `LoggingActionDispatcher`, `PlatformActionResolver`, `LanActionJsonFactory`, and `DeckKnobPreset` updated to handle it.
+- **`AudioOutputDevice` model:** Carries device UID, display name, and active flag. Included in `PlatformSlotState` and forwarded to `AppState`.
+- **Unit test — Keep Keyboard Awake visibility:** `KeepKeyboardAwakeVisibilityTest` documents and guards the unconditional display of the keep-keyboard-awake section in Settings.
+
+### Changed
+
+- **Mac Bridge — Tailscale IP isolation:** `_resolve_base_url` in the Mac agent now saves discovered Tailscale IPs under a dedicated `tailscale_ip` key in `mac_bridge.json`, leaving `android_ip` (LAN IP) untouched. A saved Tailscale IP is tried as a fast-path before live Tailscale discovery. This fixes sessions failing over WiFi after a Tailscale session had overwritten the LAN IP.
+
+### Fixed
+
+- **Keep Keyboard Awake always visible:** The section in `SettingsScreen` was gated on `PhysicalKeyboardConnectionState.CONNECTED`, causing it to disappear whenever the BT keyboard was not connected at the time of opening Settings. Gate removed — section is now always shown.
+- **`triggerDeckButton` race condition:** When a button tap arrived within one animation frame of a swipe, `activeDeckPageIndex` had not yet updated and the button lookup returned nothing. Added a fallback that searches all pages when the button is not found in the active page.
+
 ## [1.5.0] - 2026-04-22
 
 ### Added
@@ -131,6 +149,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Initial public release: Jetpack Compose shell, release signing via `keystore.properties`, and project tooling.
 
+[1.6.0]: https://github.com/JUANES545/DeckBridge/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/JUANES545/DeckBridge/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/JUANES545/DeckBridge/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/JUANES545/DeckBridge/compare/v1.2.0...v1.3.0

@@ -121,6 +121,10 @@ class MainViewModel(
         viewModelScope.launch { repository.deleteDeckPage(index) }
     }
 
+    fun deleteAudioPage() {
+        viewModelScope.launch { repository.deleteAudioPage() }
+    }
+
     companion object {
         fun factory(
             repository: DeckBridgeRepository,

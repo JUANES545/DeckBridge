@@ -34,11 +34,12 @@ object LanActionJsonFactory {
 
     fun actionJsonOrNull(resolved: ResolvedAction): String? {
         return when (resolved.kind) {
-            ResolvedActionKind.KEY_CHORD  -> comboJson(resolved)
-            ResolvedActionKind.SYSTEM_MEDIA -> mediaJson(resolved.intentId)
-            ResolvedActionKind.TEXT       -> textJson(resolved.textPayload)
-            ResolvedActionKind.KEY        -> keyJson(resolved.keyToken)
-            ResolvedActionKind.NOOP       -> null
+            ResolvedActionKind.KEY_CHORD           -> comboJson(resolved)
+            ResolvedActionKind.SYSTEM_MEDIA        -> mediaJson(resolved.intentId)
+            ResolvedActionKind.TEXT                -> textJson(resolved.textPayload)
+            ResolvedActionKind.KEY                 -> keyJson(resolved.keyToken)
+            ResolvedActionKind.AUDIO_OUTPUT_SELECT -> audioOutputSelectJson(resolved.textPayload)
+            ResolvedActionKind.NOOP                -> null
         }
     }
 
@@ -69,6 +70,14 @@ object LanActionJsonFactory {
         return JSONObject()
             .put("type", "key")
             .put("key", k)
+            .toString()
+    }
+
+    private fun audioOutputSelectJson(uid: String?): String? {
+        val u = uid?.trim()?.ifBlank { null } ?: return null
+        return JSONObject()
+            .put("type", "audio_output_select")
+            .put("uid", u)
             .toString()
     }
 

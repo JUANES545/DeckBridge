@@ -321,3 +321,16 @@ suspend fun DataStore<Preferences>.writeKeepKeyboardAwake(enabled: Boolean) {
         prefs[KEY_KEEP_KEYBOARD_AWAKE] = enabled
     }
 }
+
+private val KEY_AUDIO_PAGE_VISIBLE = booleanPreferencesKey("audio_page_visible")
+
+/** Defaults to true — the audio page is shown until the user explicitly removes it. */
+suspend fun DataStore<Preferences>.readAudioPageVisible(): Boolean {
+    return data.map { it[KEY_AUDIO_PAGE_VISIBLE] }.first() ?: true
+}
+
+suspend fun DataStore<Preferences>.writeAudioPageVisible(visible: Boolean) {
+    edit { prefs ->
+        prefs[KEY_AUDIO_PAGE_VISIBLE] = visible
+    }
+}

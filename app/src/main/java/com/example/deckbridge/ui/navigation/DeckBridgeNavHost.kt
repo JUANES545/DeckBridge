@@ -124,6 +124,7 @@ fun DeckBridgeNavHost(
                 onDeletePage = { viewModel.deleteDeckPage(state.activeDeckPageIndex) },
                 onReorderPage = viewModel::reorderDeckPages,
                 onUpdatePageName = { index, name -> viewModel.updateDeckPageName(index, name) },
+                onDeleteAudioPage = viewModel::deleteAudioPage,
             )
         }
         composable(DeckBridgeDestinations.SETTINGS) {

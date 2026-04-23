@@ -67,5 +67,6 @@ object DeckKnobPreset {
         is DeckButtonIntent.SystemMedia -> DeckGridActionKind.MEDIA
         is DeckButtonIntent.PageNav -> DeckGridActionKind.PAGE_NAV
         is DeckButtonIntent.Noop -> DeckGridActionKind.NOOP
+        is DeckButtonIntent.AudioOutputSelect -> DeckGridActionKind.NOOP
     }
 }

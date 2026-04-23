@@ -216,6 +216,12 @@ interface DeckBridgeRepository {
     /** Deletes the page at [index]. No-op if only one page exists. Adjusts [AppState.activeDeckPageIndex] if needed. */
     suspend fun deleteDeckPage(index: Int): Result<Unit>
 
+    /**
+     * Permanently hides the synthetic Audio Outputs page (persisted to DataStore).
+     * The page won't reappear on restart.
+     */
+    suspend fun deleteAudioPage()
+
     /** Switches to page [index] without modifying any button data. */
     suspend fun setActiveDeckPage(index: Int)
 

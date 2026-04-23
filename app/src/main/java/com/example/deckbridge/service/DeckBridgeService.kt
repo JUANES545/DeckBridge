@@ -28,15 +28,26 @@ class DeckBridgeService : Service() {
     override fun onCreate() {
         super.onCreate()
         ensureNotificationChannel()
-        // Call startForeground() immediately in onCreate so Android's 5-second deadline
-        // is met even on devices with aggressive battery optimization (e.g. LineageOS).
-        // onStartCommand() may be queued behind other main-thread work and arrive late.
+        // Always satisfy Android's 5-second startForeground() deadline immediately.
         startForeground(NOTIFICATION_ID, buildNotification())
+        // If stop() was called before our onCreate() ran (fast background→foreground cycle),
+        // self-terminate now that the OS deadline is satisfied.
+        if (stopRequested) {
+            stopRequested = false
+            DeckBridgeLog.state("DeckBridgeService: immediate self-stop (stop requested before onCreate)")
+            stopSelf()
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // Re-promote to foreground in case the service was demoted or restarted by the system.
         startForeground(NOTIFICATION_ID, buildNotification())
+        if (stopRequested) {
+            stopRequested = false
+            DeckBridgeLog.state("DeckBridgeService: immediate self-stop (stop requested before onStartCommand)")
+            stopSelf()
+            return START_NOT_STICKY
+        }
         DeckBridgeLog.state("DeckBridgeService: started (background mode)")
         return START_STICKY
     }
@@ -88,7 +99,17 @@ class DeckBridgeService : Service() {
         const val CHANNEL_ID = "deckbridge_bg"
         private const val NOTIFICATION_ID = 1001
 
+        /**
+         * Set to true by [stop] when called before the service's [onCreate] has run.
+         * The service checks this flag in [onCreate]/[onStartCommand] and self-terminates
+         * immediately after satisfying Android's startForeground() deadline.
+         * This prevents the ForegroundServiceDidNotStartInTimeException race condition
+         * on devices with aggressive battery optimization (e.g. Samsung Exynos).
+         */
+        @Volatile var stopRequested = false
+
         fun start(context: Context) {
+            stopRequested = false
             val intent = Intent(context, DeckBridgeService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)
@@ -98,6 +119,7 @@ class DeckBridgeService : Service() {
         }
 
         fun stop(context: Context) {
+            stopRequested = true
             context.stopService(Intent(context, DeckBridgeService::class.java))
         }
     }

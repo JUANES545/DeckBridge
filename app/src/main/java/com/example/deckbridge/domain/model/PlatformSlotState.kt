@@ -23,4 +23,6 @@ data class PlatformSlotState(
     val macBridgeActionDropped: Boolean = false,
     /** Local WiFi IP of this Android device — shown in Settings so the user can type it in the Mac agent. */
     val macBridgeServerLocalIp: String? = null,
+    /** Audio output devices reported by the Mac agent via POST /state. Empty until first push. */
+    val audioOutputs: List<AudioOutputDevice> = emptyList(),
 )

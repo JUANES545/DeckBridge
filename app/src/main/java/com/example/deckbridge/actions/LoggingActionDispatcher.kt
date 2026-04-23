@@ -15,6 +15,7 @@ class LoggingActionDispatcher : ActionDispatcher {
             ResolvedActionKind.TEXT -> "TEXT"
             ResolvedActionKind.KEY -> "KEY"
             ResolvedActionKind.NOOP -> "NOOP"
+            ResolvedActionKind.AUDIO_OUTPUT_SELECT -> "AUDIO"
         }
         DeckBridgeLog.action(
             "[${resolved.platform.name}|$kind] ${resolved.intentDisplayName} → ${resolved.shortcutDisplay} (id=${resolved.intentId})",
