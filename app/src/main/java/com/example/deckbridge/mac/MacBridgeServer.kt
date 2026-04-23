@@ -34,6 +34,8 @@ import java.util.concurrent.atomic.AtomicReference
  *   GET  /health          → {"ok":true,"device":"android","bridge_port":8767,"paired":<bool>}
  *   GET  /action/next     → long-poll (≤55 s); returns {"ok":true,"action":{...}|null}
  *                           Requires X-DeckBridge-Pair-Token header when paired.
+ *   POST /state           → Mac agent pushes {"audio_outputs":[...]} on connect and on change.
+ *                           Fires [onStateUpdate] callback; returns {"ok":true}.
  *
  * Pairing: uses the existing MAC-slot pair token from DataStore (established via QR flow,
  * optionally over ADB reverse for first-time corporate-Mac setup).
@@ -65,6 +67,9 @@ class MacBridgeServer {
     private var serverSocket: ServerSocket? = null
     private val droppedActionCount = AtomicInteger(0)
     private val discoverySocket = AtomicReference<DatagramSocket?>(null)
+
+    /** Called when the Mac agent POSTs /state; receives the raw JSON body string. */
+    @Volatile var onStateUpdate: ((String) -> Unit)? = null
 
     val isRunning: Boolean get() = running.get()
 
@@ -149,6 +154,16 @@ class MacBridgeServer {
                         line.substring(colon + 1).trim()
                 }
 
+                // Read body for POST requests
+                val body = if (method == "POST") {
+                    val len = headers["content-length"]?.toIntOrNull() ?: 0
+                    if (len > 0) {
+                        val buf = CharArray(len.coerceAtMost(131_072))
+                        val read = reader.read(buf, 0, buf.size)
+                        if (read > 0) String(buf, 0, read) else ""
+                    } else ""
+                } else ""
+
                 val clientToken = headers[HEADER_PAIR_TOKEN.lowercase()]
                 DeckBridgeLog.lan("MacBridge $method $path from ${socket.inetAddress.hostAddress}")
 
@@ -156,6 +171,8 @@ class MacBridgeServer {
                     method == "GET" && path == "/health" -> handleHealth(out)
                     method == "GET" && path == "/action/next" ->
                         handleNextAction(out, clientToken, socket.inetAddress.hostAddress)
+                    method == "POST" && path == "/state" ->
+                        handleStateUpdate(out, body, clientToken)
                     else -> sendJson(out, 404, """{"ok":false,"error":"not_found"}""")
                 }
             } catch (e: Exception) {
@@ -194,6 +211,17 @@ class MacBridgeServer {
         } else {
             sendJson(out, 200, """{"ok":true,"action":$action}""")
         }
+    }
+
+    private fun handleStateUpdate(out: PrintWriter, body: String, clientToken: String?) {
+        val token = pairToken.get()
+        if (token != null && clientToken != token) {
+            sendJson(out, 401, """{"ok":false,"error":"invalid_token"}""")
+            return
+        }
+        DeckBridgeLog.lan("MacBridge POST /state body_len=${body.length}")
+        onStateUpdate?.invoke(body)
+        sendJson(out, 200, """{"ok":true}""")
     }
 
     // ── UDP discovery responder ───────────────────────────────────────────────

@@ -68,6 +68,11 @@ data class AppState(
     val macSlot: PlatformSlotState = PlatformSlotState(channel = HostDeliveryChannel.MAC_BRIDGE),
     /** When true the repository maintains a GATT keep-alive ping to prevent the BT keyboard from sleeping. */
     val keepKeyboardAwake: Boolean = false,
+    /**
+     * When true a synthetic "Audio Outputs" page is appended as the last entry in [deckPages].
+     * Set to false permanently when the user removes it via the page manager.
+     */
+    val audioPageEnabled: Boolean = true,
 ) {
     // ── Active slot ──────────────────────────────────────────────────────────
     val activeSlot: PlatformSlotState get() = when (hostPlatform.coerceForDeckData()) {

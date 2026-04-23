@@ -118,8 +118,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         SessionFileLog.flush()
-        // Keep connections alive in the background via foreground service.
-        DeckBridgeService.start(this)
+        // Only start the background service when the app truly leaves the foreground.
+        // Config changes (rotation, keyboard connect) also trigger onStop/onResume — skip those
+        // to avoid the startForegroundService race condition on Samsung Exynos devices.
+        if (!isChangingConfigurations) {
+            DeckBridgeService.start(this)
+        }
         super.onStop()
     }
 

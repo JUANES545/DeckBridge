@@ -162,13 +162,11 @@ fun SettingsScreen(
             SectionLabel(stringResource(R.string.settings_section_keyboard_host))
             KeyboardHostCompactCard(state = state)
 
-            if (state.physicalKeyboard.state == PhysicalKeyboardConnectionState.CONNECTED) {
-                SectionLabel(stringResource(R.string.settings_section_keep_keyboard))
-                KeepKeyboardAwakeCard(
-                    keepAwake = state.keepKeyboardAwake,
-                    onChanged = onKeepKeyboardAwakeChanged,
-                )
-            }
+            SectionLabel(stringResource(R.string.settings_section_keep_keyboard))
+            KeepKeyboardAwakeCard(
+                keepAwake = state.keepKeyboardAwake,
+                onChanged = onKeepKeyboardAwakeChanged,
+            )
 
             // ── PC connections ───────────────────────────────────────────────
             SectionLabel(stringResource(R.string.settings_section_windows_pc))

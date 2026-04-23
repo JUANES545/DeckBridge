@@ -149,6 +149,14 @@ object PlatformActionResolver {
                 shortcutDisplay = "Page ←",
                 kind = ResolvedActionKind.NOOP,
             )
+            is DeckButtonIntent.AudioOutputSelect -> ResolvedAction(
+                intentId = intent.intentId,
+                intentDisplayName = intent.deviceName,
+                platform = p,
+                shortcutDisplay = "Audio → ${intent.deviceName}",
+                kind = ResolvedActionKind.AUDIO_OUTPUT_SELECT,
+                textPayload = intent.uid,
+            )
             DeckButtonIntent.Noop -> ResolvedAction(
                 intentId = intent.intentId,
                 intentDisplayName = "No-op",

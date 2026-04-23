@@ -129,6 +129,7 @@ fun HomeScreen(
     onDeletePage: () -> Unit = {},
     onReorderPage: (List<Int>) -> Unit = {},
     onUpdatePageName: (index: Int, name: String?) -> Unit = { _, _ -> },
+    onDeleteAudioPage: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val config = LocalConfiguration.current
@@ -435,10 +436,12 @@ fun HomeScreen(
             }
         }
         if (showPageSheet) {
+            val audioPageIndex = if (state.audioPageEnabled) state.deckPageCount - 1 else null
             PageManagementSheet(
                 sheetState = pageSheetState,
                 pageCount = pageCount,
                 currentPage = displayedPage,
+                audioPageIndex = audioPageIndex,
                 onDismiss = { showPageSheet = false },
                 onAddPage = {
                     showPageSheet = false
@@ -451,6 +454,10 @@ fun HomeScreen(
                 onDeletePage = {
                     showPageSheet = false
                     onDeletePage()
+                },
+                onDeleteAudioPage = {
+                    showPageSheet = false
+                    onDeleteAudioPage()
                 },
                 onReorderPage = onReorderPage,
                 pageNames = state.deckPageNames,
@@ -465,21 +472,24 @@ private fun PageManagementSheet(
     sheetState: androidx.compose.material3.SheetState,
     pageCount: Int,
     currentPage: Int,
+    audioPageIndex: Int? = null,
     onDismiss: () -> Unit,
     onAddPage: () -> Unit,
     onDuplicatePage: () -> Unit,
     onDeletePage: () -> Unit,
+    onDeleteAudioPage: () -> Unit = {},
     onReorderPage: (List<Int>) -> Unit,
     pageNames: List<String?> = emptyList(),
     onUpdatePageName: (index: Int, name: String?) -> Unit = { _, _ -> },
 ) {
-    val canAdd = pageCount < com.example.deckbridge.domain.deck.DeckPagesPersisted.MAX_PAGES
-    val canDelete = pageCount > 1
+    val userPageCount = if (audioPageIndex != null) pageCount - 1 else pageCount
+    val canAdd = userPageCount < com.example.deckbridge.domain.deck.DeckPagesPersisted.MAX_PAGES
+    val canDelete = userPageCount > 1 && currentPage != audioPageIndex
     val sheetBg = Color(0xFF12121C)
 
-    // ── Drag-to-reorder state ─────────────────────────────────────────────────
-    val pageItems = remember(pageCount) { androidx.compose.runtime.snapshots.SnapshotStateList<Int>().also { list ->
-        repeat(pageCount) { list.add(it) }
+    // ── Drag-to-reorder state (user pages only — audio page excluded) ─────────
+    val pageItems = remember(userPageCount) { androidx.compose.runtime.snapshots.SnapshotStateList<Int>().also { list ->
+        repeat(userPageCount) { list.add(it) }
     }}
     val lazyListState = rememberLazyListState()
     val reorderState = rememberReorderableLazyListState(lazyListState) { from, to ->
@@ -682,6 +692,49 @@ private fun PageManagementSheet(
                 }
             }
 
+            // ── Audio page row (non-draggable, always at end when present) ────
+            if (audioPageIndex != null) {
+                item(key = "audio_page") {
+                    val isAudioActive = currentPage == audioPageIndex
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(if (isAudioActive) Color.White.copy(alpha = 0.04f) else Color.Transparent)
+                            .padding(start = 20.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.LaptopMac,
+                            contentDescription = null,
+                            tint = if (isAudioActive) Color(0xFF3D62FF) else Color.White.copy(alpha = 0.35f),
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(14.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                text = "Audio Outputs",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = if (isAudioActive) FontWeight.SemiBold else FontWeight.Normal,
+                                color = Color.White.copy(alpha = if (isAudioActive) 0.90f else 0.60f),
+                            )
+                            Text(
+                                text = "Mac audio devices · managed automatically",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = 0.30f),
+                            )
+                        }
+                        IconButton(onClick = onDeleteAudioPage, modifier = Modifier.size(44.dp)) {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = "Remove Audio Outputs page",
+                                tint = Color(0xFFFF6B5A).copy(alpha = 0.70f),
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
+                    }
+                }
+            }
+
             // ── Action footer ─────────────────────────────────────────────────
             item(key = "footer") {
                 Column(Modifier.fillMaxWidth()) {
@@ -690,7 +743,7 @@ private fun PageManagementSheet(
                     SheetActionRow(
                         icon = Icons.Outlined.Add,
                         label = "Add page",
-                        subtitle = if (canAdd) "Page ${pageCount + 1} of ${com.example.deckbridge.domain.deck.DeckPagesPersisted.MAX_PAGES} max"
+                        subtitle = if (canAdd) "Page ${userPageCount + 1} of ${com.example.deckbridge.domain.deck.DeckPagesPersisted.MAX_PAGES} max"
                                    else "Maximum ${com.example.deckbridge.domain.deck.DeckPagesPersisted.MAX_PAGES} pages reached",
                         enabled = canAdd,
                         onClick = onAddPage,
@@ -698,16 +751,20 @@ private fun PageManagementSheet(
                     SheetActionRow(
                         icon = Icons.Outlined.ContentCopy,
                         label = "Duplicate this page",
-                        subtitle = if (canAdd) "Copy inserted after current page"
+                        subtitle = if (canAdd && currentPage != audioPageIndex) "Copy inserted after current page"
+                                   else if (currentPage == audioPageIndex) "Can't duplicate the audio page"
                                    else "Maximum ${com.example.deckbridge.domain.deck.DeckPagesPersisted.MAX_PAGES} pages reached",
-                        enabled = canAdd,
+                        enabled = canAdd && currentPage != audioPageIndex,
                         onClick = onDuplicatePage,
                     )
                     SheetActionRow(
                         icon = Icons.Outlined.Delete,
                         label = "Delete this page",
-                        subtitle = if (canDelete) "Current page will be removed"
-                                   else "Can't delete the only page",
+                        subtitle = when {
+                            currentPage == audioPageIndex -> "Use × button on the Audio Outputs row"
+                            canDelete -> "Current page will be removed"
+                            else -> "Can't delete the only page"
+                        },
                         enabled = canDelete,
                         isDestructive = true,
                         onClick = onDeletePage,

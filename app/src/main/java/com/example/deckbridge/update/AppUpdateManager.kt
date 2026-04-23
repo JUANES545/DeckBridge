@@ -131,9 +131,9 @@ class AppUpdateManager(
      * No-op unless state is [UpdateState.NeedsPermission] and permission is now granted.
      */
     fun retryAfterPermissionGrant() {
-        val info = (_state.value as? UpdateState.NeedsPermission)?.info
-            ?: (_state.value as? UpdateState.Available)?.info
-            ?: return
+        // Only act when the user explicitly went to grant install permission and came back.
+        // Do NOT trigger on plain Available state — that would start a download on every resume.
+        val info = (_state.value as? UpdateState.NeedsPermission)?.info ?: return
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O ||
             appContext.packageManager.canRequestPackageInstalls()
         ) {
@@ -162,21 +162,26 @@ class AppUpdateManager(
     }
 
     private fun startDownload(info: UpdateInfo) {
-        val dm = appContext.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-        val req = DownloadManager.Request(Uri.parse(info.apkDownloadUrl))
-            .setTitle("DeckBridge ${info.latestVersion}")
-            .setDescription("Descargando actualización…")
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
-            .setDestinationInExternalFilesDir(
-                appContext,
-                Environment.DIRECTORY_DOWNLOADS,
-                "DeckBridge-${info.latestVersion}.apk",
-            )
-            .setMimeType("application/vnd.android.package-archive")
-        val downloadId = dm.enqueue(req)
-        _state.value = UpdateState.Downloading(info, -1f)
-        DeckBridgeLog.state("update: download enqueued id=$downloadId")
-        pollDownload(dm, downloadId, info)
+        try {
+            val dm = appContext.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            val req = DownloadManager.Request(Uri.parse(info.apkDownloadUrl))
+                .setTitle("DeckBridge ${info.latestVersion}")
+                .setDescription("Descargando actualización…")
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
+                .setDestinationInExternalFilesDir(
+                    appContext,
+                    Environment.DIRECTORY_DOWNLOADS,
+                    "DeckBridge-${info.latestVersion}.apk",
+                )
+                .setMimeType("application/vnd.android.package-archive")
+            val downloadId = dm.enqueue(req)
+            _state.value = UpdateState.Downloading(info, -1f)
+            DeckBridgeLog.state("update: download enqueued id=$downloadId")
+            pollDownload(dm, downloadId, info)
+        } catch (e: Exception) {
+            DeckBridgeLog.state("update: startDownload failed — ${e.javaClass.simpleName}: ${e.message?.take(120)}")
+            // Keep state as Available so the user can retry manually; never crash the app.
+        }
     }
 
     private fun pollDownload(dm: DownloadManager, downloadId: Long, info: UpdateInfo) {

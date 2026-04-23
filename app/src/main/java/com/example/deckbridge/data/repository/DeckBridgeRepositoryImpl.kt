@@ -28,6 +28,8 @@ import com.example.deckbridge.data.deck.DeckKnobPreset
 import com.example.deckbridge.data.hardware.HardwareBridge
 import com.example.deckbridge.data.hardware.HardwareCalibrationJson
 import com.example.deckbridge.data.mock.MockAppStateFactory
+import com.example.deckbridge.data.preferences.readAudioPageVisible
+import com.example.deckbridge.data.preferences.writeAudioPageVisible
 import com.example.deckbridge.data.preferences.readKeepKeyboardAwake
 import com.example.deckbridge.data.preferences.writeKeepKeyboardAwake
 import com.example.deckbridge.data.preferences.readAnimatedBackgroundMode
@@ -77,6 +79,8 @@ import com.example.deckbridge.domain.hardware.HardwareControlId
 import com.example.deckbridge.domain.hardware.HardwareHighlightKind
 import com.example.deckbridge.domain.hardware.HardwareMirrorHighlight
 import com.example.deckbridge.domain.hardware.KnobMirrorRotationAccum
+import com.example.deckbridge.domain.model.AudioOutputDevice
+import com.example.deckbridge.domain.model.MacroButton
 import com.example.deckbridge.domain.model.AnimatedBackgroundMode
 import com.example.deckbridge.domain.model.AnimatedBackgroundTheme
 import com.example.deckbridge.domain.model.AppState
@@ -266,6 +270,10 @@ class DeckBridgeRepositoryImpl(
         }
 
         externalScope.launch {
+            // Read audio page preference before applying the surface so the audio page is
+            // (or isn't) included from the very first AppState emission.
+            val audioPageVisible = dataStore.readAudioPageVisible()
+            if (!audioPageVisible) _appState.update { it.copy(audioPageEnabled = false) }
             // Load persisted deck surface first so the UI reflects the user's layout ASAP.
             // Previously done via runBlocking() on the calling thread (ANR risk on slow storage).
             val surface = withContext(Dispatchers.IO) { loadPersistedMultiPageOrSeed() }
@@ -873,6 +881,38 @@ class DeckBridgeRepositoryImpl(
         if (enabled) maybeStartKeepAlive() else stopKeepAlive()
     }
 
+    private fun onMacBridgeStateUpdate(body: String) {
+        try {
+            val json = org.json.JSONObject(body)
+            val arr = json.optJSONArray("audio_outputs") ?: return
+            val devices = (0 until arr.length()).map { i ->
+                val dev = arr.getJSONObject(i)
+                AudioOutputDevice(
+                    uid = dev.optString("uid"),
+                    name = dev.optString("name"),
+                    isActive = dev.optBoolean("is_active"),
+                )
+            }
+            val active = devices.firstOrNull { it.isActive }?.name ?: "none"
+            DeckBridgeLog.lan("MacBridge state: ${devices.size} audio output(s), active=$active")
+            _appState.update { prev ->
+                val newMacSlot = prev.macSlot.copy(audioOutputs = devices)
+                if (!prev.audioPageEnabled) {
+                    prev.copy(macSlot = newMacSlot)
+                } else {
+                    val userPageCount = prev.deckPageCount - 1
+                    val audioButtons = buildAudioPageMacroButtons(devices, prev.hostPlatform)
+                    prev.copy(
+                        macSlot = newMacSlot,
+                        deckPages = prev.deckPages.take(userPageCount) + listOf(audioButtons),
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            DeckBridgeLog.lan("MacBridge state: parse error ${e.message}")
+        }
+    }
+
     private fun startMacBridgeStatePolling() {
         if (macBridgeStateJob?.isActive == true) return
         macBridgeStateJob = externalScope.launch {
@@ -1180,6 +1220,7 @@ class DeckBridgeRepositoryImpl(
         // only dispatches actions through the configured channel.
         val tok = dataStore.readLanPairTokenForPlatform(HostPlatform.MAC).trim().takeIf { it.isNotEmpty() }
         macBridgeServer.setPairToken(tok)
+        macBridgeServer.onStateUpdate = { body -> onMacBridgeStateUpdate(body) }
         macBridgeServer.start(externalScope)
         startMacBridgeStatePolling()
         DeckBridgeLog.state(
@@ -1708,7 +1749,14 @@ class DeckBridgeRepositoryImpl(
 
     override fun triggerDeckButton(buttonId: String, source: ButtonTriggerSource) {
         val snapshot = _appState.value
-        val button = snapshot.macroButtons.find { it.id == buttonId } ?: return
+        // Search in the currently displayed page first; if not found (activeDeckPageIndex may lag
+        // the swipe gesture by one frame), fall back to all pages so audio page buttons are always
+        // reachable regardless of timing.
+        val activePageButtons = snapshot.deckPages.getOrNull(snapshot.activeDeckPageIndex)
+            ?: snapshot.macroButtons
+        val button = activePageButtons.find { it.id == buttonId }
+            ?: snapshot.deckPages.asSequence().flatten().find { it.id == buttonId }
+            ?: return
         if (!button.enabled) {
             DeckBridgeLog.ui("deckTile id=$buttonId disabled — ignored")
             return
@@ -2030,26 +2078,61 @@ class DeckBridgeRepositoryImpl(
 
     private fun applyMultiPageSurfaceToAppState(surface: DeckMultiPageSurface) {
         hardwareBridge.setDeckKnobsLayout(surface.knobs)
-        val host = _appState.value.hostPlatform
+        val prev = _appState.value
+        val host = prev.hostPlatform
+        val audioPageEnabled = prev.audioPageEnabled
         val activeGrid = surface.pages.activePage
         val macros = DeckGridDisplay.applyResolvedShortcuts(
             DeckGridMacroMapper.toMacroButtons(activeGrid),
             host,
             res,
         )
-        val allPages = surface.pages.pages.map { grid ->
+        val userPages = surface.pages.pages.map { grid ->
             DeckGridDisplay.applyResolvedShortcuts(DeckGridMacroMapper.toMacroButtons(grid), host, res)
         }
+        val userPageNames: List<String?> = surface.pages.pages.map { it.name }
+        val allPages = if (audioPageEnabled)
+            userPages + listOf(buildAudioPageMacroButtons(prev.macSlot.audioOutputs, host))
+        else userPages
+        val allNames: List<String?> = if (audioPageEnabled)
+            userPageNames + listOf("Audio Outputs")
+        else userPageNames
         val bindings = DeckCatalog.physicalBindingsForFKeys(host, activeGrid.sortedButtons().map { it.id })
-        _appState.update { prev ->
-            prev.copy(
+        _appState.update { s ->
+            s.copy(
                 macroButtons = macros,
                 physicalBindingsPreview = bindings,
                 deckKnobs = surface.knobs,
                 activeDeckPageIndex = surface.pages.activePageIndex,
-                deckPageCount = surface.pages.pages.size,
+                deckPageCount = allPages.size,
                 deckPages = allPages,
-                deckPageNames = surface.pages.pages.map { it.name },
+                deckPageNames = allNames,
+            )
+        }
+    }
+
+    private fun buildAudioPageMacroButtons(
+        devices: List<AudioOutputDevice>,
+        host: HostPlatform,
+    ): List<MacroButton> = (0 until DeckGridLayoutPersisted.GRID_SLOT_COUNT).map { i ->
+        val device = devices.getOrNull(i)
+        if (device != null) {
+            MacroButton(
+                id = "audio_output_$i",
+                label = device.name,
+                intent = DeckButtonIntent.AudioOutputSelect(uid = device.uid, deviceName = device.name),
+                sortIndex = i,
+                resolvedShortcut = if (device.isActive) "● Active" else "Tap to switch",
+            )
+        } else {
+            MacroButton(
+                id = "audio_slot_empty_$i",
+                label = "",
+                intent = DeckButtonIntent.Noop,
+                sortIndex = i,
+                resolvedShortcut = "",
+                enabled = false,
+                visible = false,
             )
         }
     }
@@ -2182,6 +2265,7 @@ class DeckBridgeRepositoryImpl(
                 ?: throw IllegalStateException(app.getString(R.string.grid_edit_err_no_persisted_grid))
             val surface = DeckGridLayoutJson.decodeMultiPage(raw, res)
                 ?: throw IllegalStateException(app.getString(R.string.grid_edit_err_corrupt_grid))
+            if (index !in surface.pages.pages.indices) return@runCatching  // guard: audio page index
             if (surface.pages.pages.size <= 1) return@runCatching
             val newPages = surface.pages.pages.toMutableList().also { it.removeAt(index) }
             val newActiveIndex = surface.pages.activePageIndex.coerceAtMost(newPages.size - 1)
@@ -2194,10 +2278,34 @@ class DeckBridgeRepositoryImpl(
         }
     }
 
+    override suspend fun deleteAudioPage() {
+        withContext(Dispatchers.IO) {
+            dataStore.writeAudioPageVisible(false)
+            _appState.update { prev ->
+                if (!prev.audioPageEnabled) return@update prev
+                val userPageCount = prev.deckPageCount - 1
+                val newActive = prev.activeDeckPageIndex.coerceAtMost(userPageCount - 1)
+                prev.copy(
+                    audioPageEnabled = false,
+                    deckPageCount = userPageCount,
+                    deckPages = prev.deckPages.take(userPageCount),
+                    deckPageNames = prev.deckPageNames.take(userPageCount),
+                    activeDeckPageIndex = newActive,
+                )
+            }
+            DeckBridgeLog.state("audio page: removed by user")
+        }
+    }
+
     override suspend fun setActiveDeckPage(index: Int) {
         withContext(Dispatchers.IO) {
             val raw = dataStore.readDeckPagesLayoutJson() ?: return@withContext
             val surface = DeckGridLayoutJson.decodeMultiPage(raw, res) ?: return@withContext
+            // Audio page is virtual (last index) — update AppState but don't persist.
+            if (_appState.value.audioPageEnabled && index == surface.pages.pages.size) {
+                _appState.update { prev -> prev.copy(activeDeckPageIndex = index) }
+                return@withContext
+            }
             if (index !in surface.pages.pages.indices) return@withContext
             val next = surface.copy(pages = surface.pages.copy(activePageIndex = index))
             dataStore.writeDeckPagesLayoutJson(DeckGridLayoutJson.encodeMultiPage(next))

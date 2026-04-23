@@ -13,6 +13,8 @@ enum class ResolvedActionKind {
     SYSTEM_MEDIA,
     TEXT,
     KEY,
+    /** Switch Mac default audio output — carries uid in [ResolvedAction.textPayload]. */
+    AUDIO_OUTPUT_SELECT,
     /** No host payload; transports skip silently. */
     NOOP,
 }
