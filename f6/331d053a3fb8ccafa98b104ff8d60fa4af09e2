@@ -1,0 +1,27 @@
+app/build.gradle.kts
+  4cdbd6e2fa79fdc9 26-27
+app/src/main/java/com/example/deckbridge/domain/model/AudioOutputDevice.kt
+  4cdbd6e2fa79fdc9 1-14
+app/src/test/java/com/example/deckbridge/ui/KeepKeyboardAwakeVisibilityTest.kt
+  4cdbd6e2fa79fdc9 1-52
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "f6331d053a3fb8ccafa98b104ff8d60fa4af09e2",
+  "prompts": {
+    "4cdbd6e2fa79fdc9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b8ab4d0a-3d75-45f5-8100-3962ff2475ac",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Juan Mejía",
+      "messages": [],
+      "total_additions": 432,
+      "total_deletions": 64,
+      "accepted_lines": 423,
+      "overriden_lines": 0
+    }
+  }
+}
